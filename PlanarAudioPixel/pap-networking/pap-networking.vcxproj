@@ -65,11 +65,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="ControlByteConstants.h" />
+    <ClInclude Include="NetworkConstants.h" />
     <ClInclude Include="NetworkGlobals.h" />
     <ClInclude Include="NetworkStructures.h" />
     <ClInclude Include="Socket.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="NetworkGlobals.cpp" />
     <ClCompile Include="Socket.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

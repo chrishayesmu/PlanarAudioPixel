@@ -1,4 +1,10 @@
+// -----------------------------------------------------------------
+// This file contains a number of data structures that will be in use
+// for most or all of the networking code. Most of these data structures
+// are outlined in section 3.1 of the PAP document.
+// -----------------------------------------------------------------
 
+#include <map>
 #include "../pap-file-io/IOStructures.h"
 
 namespace Networking
@@ -91,4 +97,11 @@ namespace Networking
 
 	};
 
+	// A typedef for an AudioBuffer object, which is a map between sample IDs and
+	// audio objects.
+	typedef std::map<int, AudioSample> AudioBuffer;
+
+	// A typedef for an VolumeBuffer object, which is a map between sample IDs and
+	// VolumeInfo objects.
+	typedef std::map<int, VolumeInfo> VolumeBuffer;
 }
