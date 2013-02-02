@@ -1,4 +1,5 @@
 
+#include "../pap-file-io/IOStructures.h"
 
 namespace Networking
 {
@@ -53,4 +54,41 @@ namespace Networking
 		// The 8-byte Unix timestamp of when the client last checked in with the server.
 		unsigned long LastCheckInTime;
 	};
+
+	// A structure containing the information regarding an audio sample that is sent to
+	// clients to be played.
+	struct AudioSample 
+	{
+		// The ID of the track to which this sample belongs.
+		unsigned char TrackID;
+
+		// The ID of the sample.
+		unsigned int SampleID;
+
+		// The offset, in microseconds, that this sample should be played.
+		unsigned int TimeOffset;
+
+		// The information regarding the raw data of this audio sample.
+		IO::AudioData Data;
+
+	};
+
+	// A structure containing volume information regarding an audio sample for a particular
+	// client.
+	struct VolumeInfo 
+	{
+		// The ID of the track to which this information applies.
+		unsigned char TrackID;
+
+		// The ID of the sample to which this information applies.
+		unsigned int SampleID;
+
+		// The ID of the client to which this information applies.
+		ClientGUID ClientID;
+
+		// The volume for this sample to be played at, between 0 and 1.
+		float Volume;
+
+	};
+
 }
