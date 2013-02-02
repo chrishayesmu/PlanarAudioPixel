@@ -64,6 +64,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="ControlByteConstants.h" />
+    <ClInclude Include="NetworkGlobals.h" />
+    <ClInclude Include="NetworkStructures.h" />
     <ClInclude Include="Socket.h" />
   </ItemGroup>
   <ItemGroup>

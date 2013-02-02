@@ -1,3 +1,5 @@
+
+
 namespace Networking
 {
 	// A structure for representing IP addresses, as either a 4-byte integer
@@ -23,6 +25,15 @@ namespace Networking
 		};
 	};
 
+	// A structure for representing a client's globally unique ID (GUID). This 
+	// structure is mostly used for creating a mapping to clients for the
+	// Client Information Table.
+	struct ClientGUID
+	{
+		IP_Address BroadcastIP;
+		IP_Address LocalIP;
+	};
+
 	// A structure for representing a client's position and networking information.
 	// Defined in section 3.1 of the PAP document.
 	struct Client
@@ -31,7 +42,7 @@ namespace Networking
 		IP_Address BroadcastIP;
 
 		// The local IP of the client, generally the internal IP of the client on its network.
-		IP_Address LocalID;
+		IP_Address LocalIP;
 
 		// The speaker's X offset from the top-left corner of the speaker grid.
 		float OffsetX;

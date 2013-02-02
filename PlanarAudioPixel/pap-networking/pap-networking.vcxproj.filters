@@ -18,6 +18,15 @@
     <ClInclude Include="Socket.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ControlByteConstants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NetworkStructures.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NetworkGlobals.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Socket.cpp">
