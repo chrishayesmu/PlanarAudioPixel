@@ -2,6 +2,8 @@
 // This file contains the control bytes which are sent along with
 // every UDP packet to identify what the packet contains. These constants
 // are established in the PAP document in section 3.1.
+//
+// Author: Chris Hayes
 // -----------------------------------------------------------------
 
 namespace Networking

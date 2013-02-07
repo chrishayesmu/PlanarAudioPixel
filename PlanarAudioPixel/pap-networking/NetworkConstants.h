@@ -2,6 +2,8 @@
 // This file is intended as a helper file, which will include all of
 // the other networking files which define constants. It will also
 // define some constants which are not defined within other files.
+//
+// Author: Chris Hayes
 // -----------------------------------------------------------------
 
 #include "ControlByteConstants.h"

@@ -2,6 +2,8 @@
 // This file contains a number of data structures that will be in use
 // for most or all of the networking code. Most of these data structures
 // are outlined in section 3.1 of the PAP document.
+//
+// Author: Chris Hayes
 // -----------------------------------------------------------------
 
 #include <map>

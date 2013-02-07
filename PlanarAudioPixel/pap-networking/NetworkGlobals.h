@@ -2,6 +2,8 @@
 // This file contains global variables which are used across multiple
 // of the networking files, as well as being usable from outside
 // the networking library.
+//
+// Author: Chris Hayes
 // -----------------------------------------------------------------
 
 #include <map>
