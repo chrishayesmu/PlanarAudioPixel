@@ -63,22 +63,24 @@ namespace Networking
 		unsigned long LastCheckInTime;
 	};
 
+	typedef unsigned char trackid_t;
+	typedef unsigned int sampleid_t;
+
 	// A structure containing the information regarding an audio sample that is sent to
 	// clients to be played.
 	struct AudioSample 
 	{
 		// The ID of the track to which this sample belongs.
-		unsigned char TrackID;
+		trackid_t TrackID;
 
 		// The ID of the sample.
-		unsigned int SampleID;
+		sampleid_t SampleID;
 
 		// The offset, in microseconds, that this sample should be played.
-		unsigned int TimeOffset;
+		time_t TimeOffset;
 
 		// The information regarding the raw data of this audio sample.
 		IO::AudioData Data;
-
 	};
 
 	// A structure containing volume information regarding an audio sample for a particular
@@ -86,24 +88,23 @@ namespace Networking
 	struct VolumeInfo 
 	{
 		// The ID of the track to which this information applies.
-		unsigned char TrackID;
+		trackid_t TrackID;
 
 		// The ID of the sample to which this information applies.
-		unsigned int SampleID;
+		sampleid_t SampleID;
 
 		// The ID of the client to which this information applies.
 		ClientGUID ClientID;
 
 		// The volume for this sample to be played at, between 0 and 1.
 		float Volume;
-
 	};
 
 	// A typedef for an AudioBuffer object, which is a map between sample IDs and
 	// audio objects.
-	typedef std::map<int, AudioSample> AudioBuffer;
+	typedef std::map<sampleid_t, AudioSample> AudioBuffer;
 
 	// A typedef for an VolumeBuffer object, which is a map between sample IDs and
 	// VolumeInfo objects.
-	typedef std::map<int, VolumeInfo> VolumeBuffer;
+	typedef std::map<sampleid_t, VolumeInfo> VolumeBuffer;
 }

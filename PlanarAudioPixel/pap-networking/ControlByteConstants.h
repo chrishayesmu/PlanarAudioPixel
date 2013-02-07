@@ -48,5 +48,5 @@ namespace Networking
 	
 	// Packet identifier that is sent when a client asks the server to help with synchronizing
 	// latency, and when the server acknowledges a latency request.
-	const unsigned char SYNCHRONIZATION_REQUEST = 0x0d;
+	const unsigned char SYNCHRONIZATION_REQUEST = 0x0c;
 }
