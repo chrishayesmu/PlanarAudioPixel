@@ -15,4 +15,7 @@ namespace Networking
 	// used to store information about currently connected clients, as defined in
 	// section 3.1 of the PAP document.
 	extern std::map<ClientGUID, Client> ClientInformationTable;
+
+	// The port number on which to run network communications between the server and client.
+	extern unsigned short NetworkPort;
 }

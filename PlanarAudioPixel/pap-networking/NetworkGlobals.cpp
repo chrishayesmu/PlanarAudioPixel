@@ -6,4 +6,6 @@
 namespace Networking
 {
 	std::map<ClientGUID, Client> ClientInformationTable;
+
+	unsigned short NetworkPort = 32746;
 }

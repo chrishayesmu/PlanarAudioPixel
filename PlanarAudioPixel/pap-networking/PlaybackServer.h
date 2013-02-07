@@ -1,10 +1,13 @@
 #include "NetworkStructures.h"
+#include "Socket.h"
 //Giancarlo
 
 namespace Networking {
 
 	class PlaybackServer {
 	private:
+
+		Socket* socket;
 
 		///<summary>Receives information from a client and stores it in the client information list.</summary>
 		///<param name="data">The datagram data.</param>

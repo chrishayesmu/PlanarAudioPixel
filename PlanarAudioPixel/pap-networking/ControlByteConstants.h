@@ -8,6 +8,7 @@
 
 namespace Networking
 {
+
 	// Packet identifier that is sent when a client requests to establish a connection, 
 	// or when the server accepts the connection.
 	const unsigned char NEW_CONNECTION = 0x01;

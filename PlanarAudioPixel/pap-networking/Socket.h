@@ -1,3 +1,4 @@
+#pragma once
 
 #include <winsock2.h>
 #include <WS2tcpip.h>
@@ -28,6 +29,22 @@ namespace Networking {
 		RAW = 3,
 		RDM = 4,
 		SEQPACKET = 5
+	};
+
+	// Address Family types for creation
+	enum AddressFamily : int {
+		//The address family is unspecified.
+		Unspecified = AF_UNSPEC,
+		//The Internet Protocol version 4 (IPv4) address family.
+		IPv4 = AF_INET,
+		//The NetBIOS address family. This address family is only supported if a Windows Sockets provider for NetBIOS is installed.
+		NetBIOS = AF_NETBIOS,
+		//The Internet Protocol version 6 (IPv6) address family.
+		IPv6 = AF_INET6,
+		//The Infrared Data Association (IrDA) address family. This address family is only supported if the computer has an infrared port and driver installed.
+		InfraredDataAssociation = AF_IRDA,
+		//The Bluetooth address family. This address family is only supported if a Bluetooth adapter is installed on Windows Server 2003 or later.
+		Bluetooth = AF_BTH
 	};
 
 	#ifdef UNICODE
@@ -78,9 +95,9 @@ namespace Networking {
 		///<summary>Creates socket with the given socket type.</summary>
 		///<param name="s">A reference to the Socket* to fill with a new Socket class.</param>
 		///<param name="t">The socket type for this socket from the SocketType enum. (TCP, UDP, etc..).</param>
-		///<param name="AddressFamily">THe specific address family to which this socket applies.</param>
+		///<param name="AddressFamily">The specific address family to which this socket applies.</param>
 		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
-		static int Create(Socket** s, SocketType t, int AddressFamily);
+		static int Create(Socket** s, SocketType t, AddressFamily af);
 
 		///<summary>Bind a receiving port number for connectionless socket types.</summary>
 		///<param name="port">The number of the port to bind.</param>
@@ -95,9 +112,8 @@ namespace Networking {
 
 		///<summary>Helper function to set this socket up as a receiving UDP socket.</summary>
 		///<param name="port">The port to receive data from.</param>
-		///<param name="sendIP">The string representation of the IP address to bind.</param>
 		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
-		int PrepareUDPReceive(unsigned short port, const char* sendIP);
+		int PrepareUDPReceive(unsigned short port);
 
 		///<summary>Helper function to set this socket up as a sending UDP socket.</summary>
 		///<param name="port">The port to send data on.</param>
@@ -113,7 +129,7 @@ namespace Networking {
 	
 		///<summary>Blocking call that receives a message on this socket.</summary>
 		///<param name="buffer">The buffer in which to store the received message.</param>
-		///<param name="buffersize">The maximum length of the buffer.<param>
+		///<param name="buffersize">The maximum length of the buffer.</param>
 		///<param name="sender">A reference to the sockadd_in struct to fill with the information regarding the sending.</param>
 		///<param name="senderSize">A reference to an integer to fill with the byte length of <paramref name="sender" />.</param>
 		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>

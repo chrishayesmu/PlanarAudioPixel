@@ -10,9 +10,9 @@ namespace Networking {
 
 	int Socket::Create(Socket** s, SocketType t){
 		//Call the general creation method with AddressFamily_Unspecified
-		return Socket::Create(s, t, AF_UNSPEC);
+		return Socket::Create(s, t, AddressFamily::Unspecified);
 	}
-	int Socket::Create(Socket** s, SocketType t, int AddressFamily){
+	int Socket::Create(Socket** s, SocketType t, AddressFamily af){
 		if (!s) return SocketError_POINTER;
 
 		int hr = SocketError_OK;
@@ -28,21 +28,21 @@ namespace Networking {
 
 		// Set up the address info for this socket
 		ZeroMemory(&sc->addressInfo, sizeof(sc->addressInfo));
-		sc->addressInfo.ai_family = AddressFamily;
+		sc->addressInfo.ai_family = af;
 
 		// Set up sending and receiving address information
 		sc->recvSocket = INVALID_SOCKET;
 		sc->sendSocket = INVALID_SOCKET;
 		switch (t){
 		case TCP:
-			sc->recvSocket = socket(AddressFamily, SOCK_STREAM, IPPROTO_TCP);
-			sc->sendSocket = socket(AddressFamily, SOCK_STREAM, IPPROTO_TCP);
+			sc->recvSocket = socket(af, SOCK_STREAM, IPPROTO_TCP);
+			sc->sendSocket = socket(af, SOCK_STREAM, IPPROTO_TCP);
 			sc->addressInfo.ai_socktype = SOCK_STREAM;
 			sc->addressInfo.ai_protocol = IPPROTO_TCP;
 			break;
 		case UDP:
-			sc->recvSocket = socket(AddressFamily, SOCK_DGRAM, IPPROTO_UDP);
-			sc->sendSocket = socket(AddressFamily, SOCK_DGRAM, IPPROTO_UDP);
+			sc->recvSocket = socket(af, SOCK_DGRAM, IPPROTO_UDP);
+			sc->sendSocket = socket(af, SOCK_DGRAM, IPPROTO_UDP);
 			sc->addressInfo.ai_socktype = SOCK_DGRAM;
 			sc->addressInfo.ai_protocol = IPPROTO_UDP;
 			break;
@@ -100,13 +100,12 @@ namespace Networking {
 		this->boundSendIP = true;
 	}
 
-	int Socket::PrepareUDPReceive(unsigned short port, const char* sendIP){
+	int Socket::PrepareUDPReceive(unsigned short port){
 		int r = 0;
 
 		// UDP receiving requires binding the receive port and sending IP
 		if (SOCKETFAILED(r = this->BindRecvPort(port))) 
 			return r;
-		this->BindSendIP(port, sendIP);
 
 		return SocketError_OK;
 	}

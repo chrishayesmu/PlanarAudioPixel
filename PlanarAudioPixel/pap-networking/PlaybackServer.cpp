@@ -1,5 +1,7 @@
 #include "PlaybackServer.h"
 #include "Socket.h"
+#include "NetworkGlobals.h"
+#include "ControlByteConstants.h"
 
 namespace Networking {
 	
@@ -50,6 +52,7 @@ namespace Networking {
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
 		int PlaybackServer::readAudioDataFromFile(char* filename, AudioSample** data, int* size) {
 
+			return NULL;
 		}
 
 		///<summary>Reads position data from the file specified and returns it as an array.</summary>
@@ -59,6 +62,7 @@ namespace Networking {
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
 		int PlaybackServer::readPositionDataFromFile(char* filename, PositionInfo** data, int* size) {
 
+			return NULL;
 		}
 
 		///<summary>Broadcasts an audio sample to the client network.</summary>
@@ -67,6 +71,7 @@ namespace Networking {
 		///<returns>Integer return code specifying the result of the call.</returns>
 		int PlaybackServer::sendAudioSample(AudioSample sampleBuffer, int sampleSize) {
 
+			return E_FAIL;
 		}
 
 		///<summary>Broadcasts volume information for the client network.</summary>
@@ -77,6 +82,7 @@ namespace Networking {
 		///<returns>Integer return code specifying the result of the call.</returns>
 		int PlaybackServer::sendVolumeData(sampleid_t segmentID, trackid_t trackID, char* volumeDataBuffer, int bufferSize) {
 
+			return E_FAIL;
 		}
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
@@ -90,6 +96,23 @@ namespace Networking {
 		// ---------------------------------------------
 
 		void PlaybackServer::testStart(){
+
+			Socket::Create(&this->socket, Networking::SocketType::UDP, Networking::AddressFamily::IPv4);
+
+			this->socket->PrepareUDPReceive(NetworkPort);
+
+			while (1){
+				
+				char datagram[1500];
+				int grams = this->socket->ReceiveMessage(datagram, 1500);
+
+				switch (datagram[0]){
+				case Networking::NEW_CONNECTION:
+					receiveClientConnection(datagram, grams);
+					break;
+				}
+
+			}
 
 		}
 }
