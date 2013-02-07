@@ -10,21 +10,6 @@ namespace Networking {
 
 		}
 
-		///<summary>Creates a synchronization thread that will maintain system synchronization.</summary>
-		void PlaybackServer::createSyncThread() {
-
-		}
-
-		///<summary>The entry point for the syncronization threads. Handles syncronizing the clients.</summary>
-		void PlaybackServer::handleSyncThread() {
-
-		}
-
-		///<summary>Send the server’s timestamp to all of its clients.</summary>
-		void PlaybackServer::broadcastSyncMessage() {
-
-		}
-
 		///<summary>Responds to a delay request sent by a client.</summary>
 		///<param name="clientID">The ID of the client to send the response to.</param>
 		void PlaybackServer::sendDelayResponseMessage(ClientGUID clientID) {
@@ -50,24 +35,29 @@ namespace Networking {
 
 		}
 
-		///<summary>Spawns a new thread to process audio and positional data. </summary>
+		///<summary>Spawns a new thread to process audio and positional data. The thread will 
+		/// automatically terminate itself when finished.</summary>
 		///<param name="audioFilename">The name of the audio file.</summary>
 		///<param name="positionFilename">The name of the position information data file.</summary>
-		void PlaybackServer::processAudioFile(char* audioFilename, char* positionFilename) {
+		void PlaybackServer::processAudioFilesOnThread(char* audioFilename, char* positionFilename) {
 
 		}
 
 		///<summary>Reads audio data from the file specified and returns it as an array.</summary>
 		///<param name="filename">The name of the audio file.</param>
-		///<returns>Audio information objects as an array.</returns>
-		AudioSample* PlaybackServer::readAudioDataFromFile(char* filename) {
+		///<param name="data">A pointer which will be filled with the address of the audio data array.</param>
+		///<param name="size">A pointer which will be filled with the number of elements in the audio data array.</param>
+		///<returns>TODO: Integer return code specifying the result of the call.</returns>
+		int PlaybackServer::readAudioDataFromFile(char* filename, AudioSample** data, int* size) {
 
 		}
 
 		///<summary>Reads position data from the file specified and returns it as an array.</summary>
 		///<param name="filename">The name of the position data file.</param>
-		///<returns>Volume information data as an array.</returns>
-		VolumeInfo* PlaybackServer::readPositionDataFromFile(char* filename) {
+		///<param name="data">A pointer which will be filled with the address of the position data array.</param>
+		///<param name="size">A pointer which will be filled with the number of elements in the position data array.</param>
+		///<returns>TODO: Integer return code specifying the result of the call.</returns>
+		int PlaybackServer::readPositionDataFromFile(char* filename, PositionInfo** data, int* size) {
 
 		}
 
@@ -85,7 +75,7 @@ namespace Networking {
 		///<param name="volumeDataBuffer">The raw data containing the volume information.</param>
 		///<param name="bufferSize">The number of bytes volume data.</param>
 		///<returns>Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::sendVolumeData(int segmentID, int trackID, char* volumeDataBuffer, int bufferSize) {
+		int PlaybackServer::sendVolumeData(sampleid_t segmentID, trackid_t trackID, char* volumeDataBuffer, int bufferSize) {
 
 		}
 
@@ -95,6 +85,9 @@ namespace Networking {
 
 		}
 
+		// ---------------------------------------------
+		// PUBLIC METHODS
+		// ---------------------------------------------
 
 		void PlaybackServer::testStart(){
 
