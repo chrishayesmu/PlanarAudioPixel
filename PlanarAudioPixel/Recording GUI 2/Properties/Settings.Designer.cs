@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Recording_GUI.Properties
+namespace Recording_GUI_2.Properties
 {
 
 

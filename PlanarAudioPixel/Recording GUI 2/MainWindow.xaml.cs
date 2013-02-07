@@ -12,8 +12,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+//using WMPLib;
 
-namespace Recording_GUI
+namespace Recording_GUI_2
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -30,15 +31,16 @@ namespace Recording_GUI
             //FileNameTextBox.Text = "Hello";
 
             // Create OpenFileDialog
-            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();          
- 
+            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
+
             // Set filter for file extension and default file extension
-            dlg.DefaultExt = ".txt";
-            dlg.Filter = "Text documents (.txt)|*.txt";
- 
+            dlg.DefaultExt = ".mp3";
+            dlg.Filter = "Audio Files (.mp3)|*.mp3";
+
+
             // Display OpenFileDialog by calling ShowDialog method
             Nullable<bool> result = dlg.ShowDialog();
- 
+
             // Get the selected file name and display in a TextBox
             if (result == true)
             {
@@ -47,7 +49,14 @@ namespace Recording_GUI
                 FileNameTextBox.Text = filename;
             }
         }
-
-
+        /*
+        //Play button
+        private void Play_Click(Object sender, EventArgs e)
+        {
+            WMPLib.WindowsMediaPlayer player = new WMPLib.WindowsMediaPlayer();
+            player.URL = @"track.mp3";
+            player.controls.play();
+        }*/
     }
 }
+
