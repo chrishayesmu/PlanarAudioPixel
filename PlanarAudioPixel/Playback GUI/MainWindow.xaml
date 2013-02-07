@@ -4,12 +4,12 @@
         Title="MainWindow" Height="350" Width="525">
     <Grid>
         <Button Content="Play" HorizontalAlignment="Left" Margin="224,264,0,0" VerticalAlignment="Top" Width="75" Click="Button_Click_1"/>
-        <Label Content="Now Playing:" HorizontalAlignment="Left" Margin="21,246,0,0" VerticalAlignment="Top" Width="86"/>
+        <Label Content="Now Playing:" HorizontalAlignment="Left" Margin="21,246,0,0" VerticalAlignment="Top" Width="108"/>
         <Slider HorizontalAlignment="Left" Margin="367,285,0,0" VerticalAlignment="Top" Width="141" ValueChanged="Slider_ValueChanged_1"/>
         <Label Content="/" HorizontalAlignment="Left" Margin="424,243,0,0" VerticalAlignment="Top" Width="17"/>
         <TextBox x:Name="startTime" HorizontalAlignment="Left" Height="23" Margin="376,246,0,0" TextWrapping="Wrap" Text="0:00" VerticalAlignment="Top" Width="43" TextChanged="startTime_TextChanged"/>
         <TextBox x:Name="endTime" HorizontalAlignment="Left" Height="23" Margin="446,246,0,0" TextWrapping="Wrap" Text="0:00" VerticalAlignment="Top" Width="49" TextChanged="TextBox_TextChanged_1"/>
-        <TextBox HorizontalAlignment="Left" Height="23" Margin="21,277,0,0" TextWrapping="Wrap" Text="No Current Audio" VerticalAlignment="Top" Width="120"/>
+        <TextBox HorizontalAlignment="Left" Height="23" Margin="21,277,0,0" TextWrapping="Wrap" Text="No Current Audio" VerticalAlignment="Top" Width="185" TextChanged="TextBox_TextChanged_1"/>
 
     </Grid>
 </Window>
