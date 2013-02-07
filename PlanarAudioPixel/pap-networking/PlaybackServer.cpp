@@ -27,7 +27,7 @@ namespace Networking {
 
 		///<summary>Responds to a delay request sent by a client.</summary>
 		///<param name="clientID">The ID of the client to send the response to.</param>
-		void PlaybackServer::sendDelayRespMessage(ClientGUID clientID) {
+		void PlaybackServer::sendDelayResponseMessage(ClientGUID clientID) {
 
 		}
 

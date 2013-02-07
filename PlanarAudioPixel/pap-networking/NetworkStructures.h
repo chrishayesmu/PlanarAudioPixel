@@ -34,6 +34,14 @@ namespace Networking
 		};
 	};
 
+	// A struct for representing positions, for compactness and in case we need
+	// to easily increase the precision of the position.
+	struct PositionInfo
+	{
+		float x;
+		float y;
+	};
+
 	// A structure for representing a client's globally unique ID (GUID). This 
 	// structure is mostly used for creating a mapping to clients for the
 	// Client Information Table.
@@ -53,11 +61,9 @@ namespace Networking
 		// The local IP of the client, generally the internal IP of the client on its network.
 		IP_Address LocalIP;
 
-		// The speaker's X offset from the top-left corner of the speaker grid.
-		float OffsetX;
-
-		// The speaker's Y offset from the top-left corner of the speaker grid.
-		float OffsetY;
+		// The client's position in the grid, stored as an offset from the top-left corner of the grid,
+		// which has position (0, 0).
+		PositionInfo Offset;
 
 		// The 8-byte Unix timestamp of when the client last checked in with the server.
 		unsigned long LastCheckInTime;
@@ -93,7 +99,7 @@ namespace Networking
 		// The ID of the sample to which this information applies.
 		sampleid_t SampleID;
 
-		// The ID of the client to which this information applies.
+		// The GUID of the client to which this information applies.
 		ClientGUID ClientID;
 
 		// The volume for this sample to be played at, between 0 and 1.

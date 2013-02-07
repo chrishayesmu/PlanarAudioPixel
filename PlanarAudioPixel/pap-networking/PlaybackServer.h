@@ -22,7 +22,7 @@ namespace Networking {
 
 		///<summary>Responds to a delay request sent by a client.</summary>
 		///<param name="clientID">The ID of the client to send the response to.</param>
-		void sendDelayRespMessage(ClientGUID clientID);
+		void sendDelayResponseMessage(ClientGUID clientID);
 
 		///<summary>Responds to an audio data resend request.</summary>
 		///<param name="data">The datagram data.</summary>
@@ -34,7 +34,8 @@ namespace Networking {
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void receiveClientCheckIn(char* data, int dataSize);
 
-		///<summary>This function will be called in order to notify the server that one or more clients have moved, join, or dropped out, and that the volume must therefore be recalculated.</summary>
+		///<summary>This function will be called in order to notify the server that one or more 
+		/// clients have moved, join, or dropped out, and that the volume must therefore be recalculated.</summary>
 		void clientPositionsChanged();
 
 		///<summary>Spawns a new thread to process audio and positional data. </summary>
@@ -50,7 +51,7 @@ namespace Networking {
 		///<summary>Reads position data from the file specified and returns it as an array.</summary>
 		///<param name="filename">The name of the position data file.</param>
 		///<returns>Volume information data as an array.</returns>
-		VolumeInfo* readPositionDataFromFile(char* filename);
+		PositionInfo* readPositionDataFromFile(char* filename);
 
 		///<summary>Broadcasts an audio sample to the client network.</summary>
 		///<param name="sampleBuffer">The sample data.</param>
@@ -59,12 +60,12 @@ namespace Networking {
 		int sendAudioSample(AudioSample sampleBuffer, int sampleSize);
 
 		///<summary>Broadcasts volume information for the client network.</summary>
-		///<param name="segmentID">The ID of the segment to which this bit of volume data applies.</param>
+		///<param name="sampleID">The ID of the sample to which this bit of volume data applies.</param>
 		///<param name="trackID">The ID of the track to which this bit of volume data applies.</param>
 		///<param name="volumeDataBuffer">The raw data containing the volume information.</param>
 		///<param name="bufferSize">The number of bytes volume data.</param>
 		///<returns>Integer return code specifying the result of the call.</returns>
-		int sendVolumeData(int segmentID, int trackID, char* volumeDataBuffer, int bufferSize);
+		int sendVolumeData(sampleid_t sampleID, trackid_t trackID, char* volumeDataBuffer, int bufferSize);
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
 		///<param name="datagram">The datagram data.</param>
