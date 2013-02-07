@@ -10,6 +10,30 @@
         <TextBox x:Name="startTime" HorizontalAlignment="Left" Height="23" Margin="376,246,0,0" TextWrapping="Wrap" Text="0:00" VerticalAlignment="Top" Width="43" TextChanged="startTime_TextChanged"/>
         <TextBox x:Name="endTime" HorizontalAlignment="Left" Height="23" Margin="446,246,0,0" TextWrapping="Wrap" Text="0:00" VerticalAlignment="Top" Width="49" TextChanged="TextBox_TextChanged_1"/>
         <TextBox HorizontalAlignment="Left" Height="23" Margin="21,277,0,0" TextWrapping="Wrap" Text="No Current Audio" VerticalAlignment="Top" Width="185" TextChanged="TextBox_TextChanged_1"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="62,20,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="109,20,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="154,20,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="201,20,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="245,20,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="292,20,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="337,20,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="384,20,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="62,99,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="109,99,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="154,99,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="201,99,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="245,99,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="292,99,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="337,99,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="384,99,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="62,176,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="109,176,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="154,176,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="201,176,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="245,176,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="292,176,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
+        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="63" Margin="337,176,0,0" Stroke="Black" VerticalAlignment="Top" Width="67"/>
+        <Button Content="X" HorizontalAlignment="Left" Margin="384,176,0,0" VerticalAlignment="Top" Width="20" Height="21" Click="Button_Click_2"/>
 
     </Grid>
 </Window>
