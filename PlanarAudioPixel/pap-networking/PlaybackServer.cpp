@@ -90,12 +90,26 @@ namespace Networking {
 		///<param name="datagramSize">The size of the datagram.</param>
 		void PlaybackServer::dispatchNetworkMessage(char* datagram, int datagramSize) {
 			
-				switch (datagram[0]){
-				case Networking::NEW_CONNECTION:
-					receiveClientConnection(datagram, datagramSize);
-					break;
-				}
+		}
+		
+		///<summary>Handles network communications and hands off incoming packets to dispatchNetworkMessage().</summary>
+		void PlaybackServer::serverReceive(){
 
+		}
+		///<summary>Multithreaded router function that calls serverReceieve().</summary>
+		DWORD PlaybackServer::serverRouteReceive(void* server){
+			static_cast<PlaybackServer*>(server)->serverReceive();
+			return 0;
+		}
+		
+		///<summary>Handles server management and control messages.</summary>
+		void PlaybackServer::serverMain(){
+			
+		}
+		///<summary>Multithreaded router function that calls serverMain().</summary>
+		DWORD PlaybackServer::serverRouteMain(void* server){
+			static_cast<PlaybackServer*>(server)->serverMain();
+			return 0;
 		}
 		
 		// ---------------------------------------------
@@ -106,22 +120,27 @@ namespace Networking {
 		///<returns>A PlaybackServer return code indicating the result of this call.</returns>
 		int PlaybackServer::Start(){
 
-			char datagram[1500];
+			//If the server is already running, do nothing.
+			switch(this->state){
+			case PlaybackServerStates::PlaybackServer_RUNNING:
+				return this->state;
+				break;
+			case PlaybackServerStates::PlaybackServer_STOPPED:
 
-			while (1){
-				
-				int grams = this->socket->ReceiveMessage(datagram, 1500);
+				break;
+			case PlaybackServerStates::PlaybackServer_PAUSED:
 
-
+				break;
 			}
 
-			return PlaybackServerCodes::PlaybackServer_OK;
-
+			//The server is not in a valid state.
+			return PlaybackServerErrorCodes::PlaybackServer_INVALID;
 		}
 		
 		///<summary>Empty default constructor.</summary>
 		PlaybackServer::PlaybackServer() {
 			this->socket = NULL;
+			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
 		}
 		
 		///<summary>Attempts to create a PlaybackServer instance and returns an error code if it could not. fillServer is filled with NULL if creation fails.</summary>

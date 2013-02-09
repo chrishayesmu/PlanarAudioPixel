@@ -9,8 +9,9 @@
 namespace Networking {
 
 	// Macros for error checking
-	#define SOCKETFAILED(x) FAILED(x)
-	#define SOCKETSUCEEEDED(x) SUCCEEDED(x)
+#define SOCKETFAILED(x) FAILED(x)
+#define SOCKETSUCEEEDED(x) SUCCEEDED(x)
+#define SOCKETTIMEOUT(x) (x == SocketErrorCode::SocketError_TIMEOUT)
 
 	// Error codes for socket functions
 	enum SocketErrorCode {
@@ -19,7 +20,8 @@ namespace Networking {
 		SocketError_INVALIDSOCKET = -2,
 		SocketError_IPNOTBOUND = -3,
 		SocketError_SOCKETERROR = SOCKET_ERROR,
-		SocketError_PORTNOTBOUND = -5
+		SocketError_PORTNOTBOUND = -5,
+		SocketError_TIMEOUT = -6
 	};
 
 	// Socket types for creation
@@ -144,16 +146,18 @@ namespace Networking {
 		///<summary>Blocking call that receives a message on this socket.</summary>
 		///<param name="buffer">The buffer in which to store the received message.</param>
 		///<param name="buffersize">The maximum length of the buffer.</param>
+		///<param name="msCount">The number of milliseconds to wait for the socket to have data available.</param>
 		///<param name="sender">A reference to the sockadd_in struct to fill with the information regarding the sending.</param>
 		///<param name="senderSize">A reference to an integer to fill with the byte length of <paramref name="sender" />.</param>
-		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
-		int TryReceiveMessage(char* buffer, int buffersize, sockaddr_in* sender, int* senderSize);
+		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function. Timeout can be checked with the SOCKETTIMEOUT(x) macro.</returns>
+		int TryReceiveMessage(char* buffer, int buffersize, time_t msCount, sockaddr_in* sender, int* senderSize);
 	
-		///<summary>Blocking call that receives a message on this socket.</summary>
+		///<summary>Attempts to recieve a message for the specified number of milliseconds.</summary>
 		///<param name="buffer">The buffer in which to store the received message.</param>
 		///<param name="buffersize">The maximum length of the buffer.<param>
-		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
-		int TryReceiveMessage(char* buffer, int buffersize);
+		///<param name="msCount">The number of milliseconds to wait for the socket to have data available.</param>
+		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function. Timeout can be checked with the SOCKETTIMEOUT(x) macro.</returns>
+		int TryReceiveMessage(char* buffer, int buffersize, time_t msCount);
 
 	};
 

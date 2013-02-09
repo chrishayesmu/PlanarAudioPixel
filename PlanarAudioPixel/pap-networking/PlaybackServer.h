@@ -1,18 +1,30 @@
 #include "NetworkStructures.h"
 #include "Socket.h"
+#include <queue>
 //Giancarlo
 
 namespace Networking {
 
-	///<summary>A set of PlaybackServer return codes.</summary>
-	enum PlaybackServerCodes {
-		PlaybackServer_OK = 0,
-		PlaybackServer_PAUSED = 1,
-		PlaybackServer_STOPPED = 2
+	///<summary>A set of PlaybackServer states.</summary>
+	enum PlaybackServerStates {
+		PlaybackServer_RUNNING = 1,
+		PlaybackServer_PAUSED = 2,
+		PlaybackServer_STOPPED = 3
 	};
+	typedef PlaybackServerStates PlaybackServerState;
 
+	///<summary>A set of PlaybackServer error codes for the return values of certain functions.</summary>
+	enum PlaybackServerErrorCodes {
+		PlaybackServer_OK = 0,
+		PlaybackServer_INVALID = 1
+	};
+	typedef PlaybackServerErrorCodes PlaybackServerErrorCode;
+
+	///<summary>A class that handles networking and audio data for managing a set of speaker nodes.</summary>
 	class PlaybackServer {
 	private:
+
+		/// Messages are processed in the order in which they are recieved.
 
 		///<summary>Used to identify a control message.</summary>
 		enum PlaybackServerRequestCodes {
@@ -34,10 +46,17 @@ namespace Networking {
 			PlaybackServerRequestData controlData;
 		};
 
+		// Control message queue
+		std::queue<PlaybackServerRequest> controlMessages;
+
+		// Main receiving socket
+		Socket* socket;
+
+		// Maintains the servers current state. Initial state is STOPPED.
+		PlaybackServerState state;
+
 		//Default constructor
 		PlaybackServer();
-
-		Socket* socket;
 
 		///<summary>Receives information from a client and stores it in the client information list.</summary>
 		///<param name="data">The datagram data.</param>
@@ -100,6 +119,16 @@ namespace Networking {
 		///<param name="datagram">The datagram data.</param>
 		///<param name="datagramSize">The size of the datagram.</param>
 		void dispatchNetworkMessage(char* datagram, int datagramSize);
+		
+		///<summary>Handles network communications and hands off incoming packets to dispatchNetworkMessage().</summary>
+		void serverReceive();
+		///<summary>Multithreaded router function that calls serverReceieve().</summary>
+		static DWORD __cdecl serverRouteReceive(void* server);
+
+		///<summary>Handles server management and control messages.</summary>
+		void serverMain();
+		///<summary>Multithreaded router function that calls serverMain().</summary>
+		static DWORD __cdecl serverRouteMain(void* server);
 
 	public:
 
@@ -109,7 +138,7 @@ namespace Networking {
 		static int Create(PlaybackServer** fillServer);
 		
 		///<summary>Attempts to start the PlaybackServer.</summary>
-		///<returns>A PlaybackServer return code indicating the result of this call.</returns>
+		///<returns>A PlaybackServerState code indicating the state of this call. If the state is not RUNNING, an error code is returned.</returns>
 		int Start();
 
 	};

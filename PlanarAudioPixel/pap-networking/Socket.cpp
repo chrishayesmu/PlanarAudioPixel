@@ -134,4 +134,35 @@ namespace Networking {
 		return this->ReceiveMessage(buffer, buffersize, NULL, NULL);
 	}
 
+	
+	///<summary>Blocking call that receives a message on this socket.</summary>
+	///<param name="buffer">The buffer in which to store the received message.</param>
+	///<param name="buffersize">The maximum length of the buffer.</param>
+	///<param name="sender">A reference to the sockadd_in struct to fill with the information regarding the sending.</param>
+	///<param name="senderSize">A reference to an integer to fill with the byte length of <paramref name="sender" />.</param>
+	///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
+	int Socket::TryReceiveMessage(char* buffer, int buffersize, time_t msCount, sockaddr_in* sender, int* senderSize){
+		struct timeval timeOut;
+		timeOut.tv_sec = msCount / 1000;
+		timeOut.tv_usec = (msCount - (timeOut.tv_sec * 1000)) * 1000;
+
+		fd_set fds;
+		fds.fd_count = 1;
+		fds.fd_array[0] = recvSocket;
+		
+		int s = select(1, &fds, NULL, NULL, &timeOut);
+
+		if (s > 0)  return this->ReceiveMessage(buffer, buffersize, sender, senderSize);
+		if (s == 0) return Networking::SocketError_TIMEOUT;
+		if (s < 0)  return s;
+	}
+	
+	///<summary>Blocking call that receives a message on this socket.</summary>
+	///<param name="buffer">The buffer in which to store the received message.</param>
+	///<param name="buffersize">The maximum length of the buffer.<param>
+	///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
+	int Socket::TryReceiveMessage(char* buffer, int buffersize, time_t msCount){
+		return this->TryReceiveMessage(buffer, buffersize, msCount, NULL, NULL);
+	}
+
 }
