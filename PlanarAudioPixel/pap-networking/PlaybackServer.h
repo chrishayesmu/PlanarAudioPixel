@@ -7,9 +7,6 @@ namespace Networking {
 	class PlaybackServer {
 	private:
 
-		//Default constructor
-		PlaybackServer();
-
 		Socket* socket;
 
 		///<summary>Receives information from a client and stores it in the client information list.</summary>
@@ -75,15 +72,9 @@ namespace Networking {
 
 	public:
 
-		///<summary>Attempts to create a PlaybackServer instance and returns an error code if it could not. fillServer is filled with NULL if creation fails.</summary>
-		///<param name="fillServer">A reference to the PlaybackServer object to fill.</param>
-		///<returns>A Networking::SocketErrorCode.</returns>
-		static int Create(PlaybackServer** fillServer);
-		
-		///<summary>Attempts to start the PlaybackServer.</summary>
-		///<returns>Integer error code on failure, 0 on success.</returns>
-		int Start();
+		void testStart();
 
+		
 	};
 
 
