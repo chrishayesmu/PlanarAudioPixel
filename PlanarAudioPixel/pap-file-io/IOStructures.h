@@ -1,3 +1,5 @@
+#pragma once
+
 namespace IO {
 
 	// A structure containing the data and information regarding an audio sample.

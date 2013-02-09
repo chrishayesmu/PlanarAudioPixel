@@ -14,6 +14,26 @@ namespace Networking {
 	class PlaybackServer {
 	private:
 
+		///<summary>Used to identify a control message.</summary>
+		enum PlaybackServerRequestCodes {
+			PlaybackServer_PAUSE,
+			PlaybackServer_STOP //,
+			//PlaybackServer_Seek,
+			//PlaybackServer_Restart, etc.
+		};
+		typedef PlaybackServerRequestCodes PlaybackServerRequestCode;
+
+		///<summary>Used to service particular control messages.</summary>
+		union PlaybackServerRequestData {
+			///time_t seekTo;
+		};
+
+		///<summary>Used to send control messages to the server like Pause/Stop/Restart, etc.</summary>
+		struct PlaybackServerRequest {
+			PlaybackServerRequestCode controlCode;
+			PlaybackServerRequestData controlData;
+		};
+
 		//Default constructor
 		PlaybackServer();
 
@@ -78,7 +98,8 @@ namespace Networking {
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
 		///<param name="datagram">The datagram data.</param>
-		void dispatchNetworkMessage(char* datagram);
+		///<param name="datagramSize">The size of the datagram.</param>
+		void dispatchNetworkMessage(char* datagram, int datagramSize);
 
 	public:
 
@@ -88,7 +109,7 @@ namespace Networking {
 		static int Create(PlaybackServer** fillServer);
 		
 		///<summary>Attempts to start the PlaybackServer.</summary>
-		///<returns>A PlaybackServer return code indicating what happened.</returns>
+		///<returns>A PlaybackServer return code indicating the result of this call.</returns>
 		int Start();
 
 	};

@@ -87,7 +87,14 @@ namespace Networking {
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
 		///<param name="datagram">The datagram data.</param>
-		void PlaybackServer::dispatchNetworkMessage(char* datagram) {
+		///<param name="datagramSize">The size of the datagram.</param>
+		void PlaybackServer::dispatchNetworkMessage(char* datagram, int datagramSize) {
+			
+				switch (datagram[0]){
+				case Networking::NEW_CONNECTION:
+					receiveClientConnection(datagram, datagramSize);
+					break;
+				}
 
 		}
 		
@@ -96,19 +103,15 @@ namespace Networking {
 		// ---------------------------------------------
 		
 		///<summary>Attempts to start the PlaybackServer.</summary>
-		///<returns>Integer error code on failure, 0 on success.</returns>
+		///<returns>A PlaybackServer return code indicating the result of this call.</returns>
 		int PlaybackServer::Start(){
+
+			char datagram[1500];
 
 			while (1){
 				
-				char datagram[1500];
 				int grams = this->socket->ReceiveMessage(datagram, 1500);
 
-				switch (datagram[0]){
-				case Networking::NEW_CONNECTION:
-					receiveClientConnection(datagram, grams);
-					break;
-				}
 
 			}
 
