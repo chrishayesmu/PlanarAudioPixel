@@ -146,6 +146,33 @@ namespace Networking {
 
 		}
 		
+		///<summary>Constructs a PlaybackServer object.</summary>
+		PlaybackServer::PlaybackServer() {
+			this->socket = NULL;
+			this->serverMainThread = NULL;
+			this->serverReceivingThread = NULL;
+			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
+			InitializeCriticalSection(&this->controlMessagesCriticalSection);
+			this->controlMessagesResourceCount = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
+			this->pausedStateSem = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
+		}
+
+		///<summary>Destructs a PlaybackServer object.</summary>
+		PlaybackServer::~PlaybackServer(){
+			if (this->socket){
+				delete this->socket;
+				this->socket = NULL;
+			}
+			if (this->serverMainThread)
+				CloseHandle(this->serverMainThread);
+			if (this->serverReceivingThread)
+				CloseHandle(this->serverReceivingThread);
+			CloseHandle(this->controlMessagesResourceCount);
+			CloseHandle(this->pausedStateSem);
+
+			DeleteCriticalSection(&this->controlMessagesCriticalSection);
+		}
+
 		// ---------------------------------------------
 		// PUBLIC METHODS
 		// ---------------------------------------------
@@ -219,33 +246,6 @@ namespace Networking {
 
 			//The server is not in a valid state.
 			return PlaybackServerErrorCodes::PlaybackServer_INVALID;
-		}
-		
-		///<summary>Constructs a PlaybackServer object.</summary>
-		PlaybackServer::PlaybackServer() {
-			this->socket = NULL;
-			this->serverMainThread = NULL;
-			this->serverReceivingThread = NULL;
-			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
-			InitializeCriticalSection(&this->controlMessagesCriticalSection);
-			this->controlMessagesResourceCount = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
-			this->pausedStateSem = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
-		}
-
-		///<summary>Destructs a PlaybackServer object.</summary>
-		PlaybackServer::~PlaybackServer(){
-			if (this->socket){
-				delete this->socket;
-				this->socket = NULL;
-			}
-			if (this->serverMainThread)
-				CloseHandle(this->serverMainThread);
-			if (this->serverReceivingThread)
-				CloseHandle(this->serverReceivingThread);
-			CloseHandle(this->controlMessagesResourceCount);
-			CloseHandle(this->pausedStateSem);
-
-			DeleteCriticalSection(&this->controlMessagesCriticalSection);
 		}
 		
 		///<summary>Attempts to create a PlaybackServer instance and returns an error code if it could not. fillServer is filled with NULL if creation fails.</summary>
