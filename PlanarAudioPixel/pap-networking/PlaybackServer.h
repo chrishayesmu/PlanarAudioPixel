@@ -4,8 +4,18 @@
 
 namespace Networking {
 
+	///<summary>A set of PlaybackServer return codes.</summary>
+	enum PlaybackServerCodes {
+		PlaybackServer_OK = 0,
+		PlaybackServer_PAUSED = 1,
+		PlaybackServer_STOPPED = 2
+	};
+
 	class PlaybackServer {
 	private:
+
+		//Default constructor
+		PlaybackServer();
 
 		Socket* socket;
 
@@ -72,9 +82,15 @@ namespace Networking {
 
 	public:
 
-		void testStart();
-
+		///<summary>Attempts to create a PlaybackServer instance and returns an error code if it could not. fillServer is filled with NULL if creation fails.</summary>
+		///<param name="fillServer">A reference to the PlaybackServer object to fill.</param>
+		///<returns>A Networking::SocketErrorCode.</returns>
+		static int Create(PlaybackServer** fillServer);
 		
+		///<summary>Attempts to start the PlaybackServer.</summary>
+		///<returns>A PlaybackServer return code indicating what happened.</returns>
+		int Start();
+
 	};
 
 

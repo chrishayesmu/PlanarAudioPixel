@@ -4,7 +4,7 @@
 #include "ControlByteConstants.h"
 
 namespace Networking {
-	
+		
 		///<summary>Receives information from a client and stores it in the client information list.</summary>
 		///<param name="data">The datagram data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
@@ -90,16 +90,14 @@ namespace Networking {
 		void PlaybackServer::dispatchNetworkMessage(char* datagram) {
 
 		}
-
+		
 		// ---------------------------------------------
 		// PUBLIC METHODS
 		// ---------------------------------------------
-
-		void PlaybackServer::testStart(){
-
-			Socket::Create(&this->socket, Networking::SocketType::UDP, Networking::AddressFamily::IPv4);
-
-			this->socket->PrepareUDPReceive(NetworkPort);
+		
+		///<summary>Attempts to start the PlaybackServer.</summary>
+		///<returns>Integer error code on failure, 0 on success.</returns>
+		int PlaybackServer::Start(){
 
 			while (1){
 				
@@ -114,5 +112,41 @@ namespace Networking {
 
 			}
 
+			return PlaybackServerCodes::PlaybackServer_OK;
+
+		}
+		
+		///<summary>Empty default constructor.</summary>
+		PlaybackServer::PlaybackServer() {
+			this->socket = NULL;
+		}
+		
+		///<summary>Attempts to create a PlaybackServer instance and returns an error code if it could not. fillServer is filled with NULL if creation fails.</summary>
+		///<param name="fillServer">A reference to the PlaybackServer object to fill.</param>
+		///<returns>A Networking::SocketErrorCode.</returns>
+		int PlaybackServer::Create(PlaybackServer** fillServer){
+			
+			//Check the pointer, and initialize to NULL
+			if (!fillServer) return Networking::SocketErrorCode::SocketError_POINTER;
+			*fillServer = NULL;
+
+			PlaybackServer* server = new PlaybackServer();
+
+			//Attempt to create the socket inside the Server
+			int socketCode = Socket::Create(&server->socket, Networking::SocketType::UDP, Networking::AddressFamily::IPv4);
+			if (SOCKETFAILED(socketCode)){
+				delete server;
+				return socketCode;
+			}
+
+			//Attempt to set the socket up for UDP receiving
+			socketCode = server->socket->PrepareUDPReceive(NetworkPort);
+			if (SOCKETFAILED(socketCode)){
+				delete server;
+				return socketCode;
+			}
+
+			*fillServer = server;
+			return Networking::SocketErrorCode::SocketError_OK;
 		}
 }
