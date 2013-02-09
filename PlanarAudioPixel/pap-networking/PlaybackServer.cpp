@@ -104,12 +104,46 @@ namespace Networking {
 		
 		///<summary>Handles server management and control messages.</summary>
 		void PlaybackServer::serverMain(){
-			
+
 		}
 		///<summary>Multithreaded router function that calls serverMain().</summary>
 		DWORD PlaybackServer::serverRouteMain(void* server){
 			static_cast<PlaybackServer*>(server)->serverMain();
 			return 0;
+		}
+		
+		///<summary>Queues up a request code to be handled by serverMain().</summary>
+		///<param name="code">The request code.</param>
+		void PlaybackServer::queueRequest(PlaybackServerRequestCode code){
+
+			//Create empty placeholder data
+			PlaybackServerRequestData emptyData;
+			memset(&emptyData, 0, sizeof(emptyData));
+
+			queueRequest(code, emptyData);
+
+		}
+		
+		///<summary>Queues up a request code to be handled by serverMain().</summary>
+		///<param name="code">The request code.</param>
+		///<param name="requestData">Additional data required to complete the request.</param>
+		void PlaybackServer::queueRequest(PlaybackServerRequestCode code, PlaybackServerRequestData requestData){
+			
+			//Acquire the message queue
+			EnterCriticalSection(&this->controlMessagesCriticalSection);
+			
+			//Construct the request
+			PlaybackServerRequest newRequest;
+			newRequest.controlCode = code;
+			newRequest.controlData = requestData;
+			this->controlMessages.push(newRequest);
+			
+			//Release the message queue
+			LeaveCriticalSection(&this->controlMessagesCriticalSection);
+
+			//Signal the new request
+			ReleaseSemaphore(this->controlMessagesResourceCount, 1, NULL);
+
 		}
 		
 		// ---------------------------------------------
@@ -120,15 +154,65 @@ namespace Networking {
 		///<returns>A PlaybackServer return code indicating the result of this call.</returns>
 		int PlaybackServer::Start(){
 
-			//If the server is already running, do nothing.
+			//god I hate the stl
+			std::queue<PlaybackServerRequest> emptyMessageQueue;
+
 			switch(this->state){
 			case PlaybackServerStates::PlaybackServer_RUNNING:
+				//If the server is already running, do nothing.
 				return this->state;
 				break;
 			case PlaybackServerStates::PlaybackServer_STOPPED:
 
+				//In case the server was running before and was stopped,
+				//make sure that the threads had a chance to terminate.
+				
+			//================================================================================
+				//The serverMain() SHOULD have stopped in order to arrive at this point.
+				
+				//If serverMain() has not stopped, attempt to signal it to terminate
+				if (this->serverMainThread && WaitForSingleObject(this->serverMainThread, 1) == WAIT_TIMEOUT){
+					this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_STOP);
+
+					//Wait for serverMain() to terminate. ---------------------------------------- We could throw an exception here after a certain amount of time?
+					WaitForSingleObject(this->serverMainThread, INFINITE);
+				}
+			//================================================================================
+			//================================================================================
+				//The serverReceive() MAY still be in a TryReceiveMessage() call.
+				WaitForSingleObject(this->serverReceivingThread, INFINITE);
+			//================================================================================
+				
+				//Clear out the message queue
+				EnterCriticalSection(&this->controlMessagesCriticalSection);
+				std::swap(this->controlMessages, emptyMessageQueue);
+				LeaveCriticalSection(&this->controlMessagesCriticalSection);
+
+				//Set the state
+				this->state = PlaybackServerStates::PlaybackServer_RUNNING;
+				
+				//Close previous thread handles
+				if (this->serverMainThread)
+					CloseHandle(this->serverMainThread);
+				if (this->serverReceivingThread)
+					CloseHandle(this->serverReceivingThread);
+
+				//Create the worker threads
+				this->serverMainThread = 
+					CreateThread(
+						NULL, 0, &PlaybackServer::serverRouteMain, static_cast<void*>(this), 0, NULL);
+				this->serverReceivingThread = 
+					CreateThread(
+						NULL, 0, &PlaybackServer::serverRouteReceive, static_cast<void*>(this), 0, NULL);
+
+				return PlaybackServerStates::PlaybackServer_RUNNING;
+
 				break;
 			case PlaybackServerStates::PlaybackServer_PAUSED:
+
+				//Allow each thread to unpause.
+				ReleaseSemaphore(this->pausedStateSem, 2, NULL);
+				return PlaybackServerStates::PlaybackServer_RUNNING;
 
 				break;
 			}
@@ -137,10 +221,31 @@ namespace Networking {
 			return PlaybackServerErrorCodes::PlaybackServer_INVALID;
 		}
 		
-		///<summary>Empty default constructor.</summary>
+		///<summary>Constructs a PlaybackServer object.</summary>
 		PlaybackServer::PlaybackServer() {
 			this->socket = NULL;
+			this->serverMainThread = NULL;
+			this->serverReceivingThread = NULL;
 			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
+			InitializeCriticalSection(&this->controlMessagesCriticalSection);
+			this->controlMessagesResourceCount = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
+			this->pausedStateSem = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
+		}
+
+		///<summary>Destructs a PlaybackServer object.</summary>
+		PlaybackServer::~PlaybackServer(){
+			if (this->socket){
+				delete this->socket;
+				this->socket = NULL;
+			}
+			if (this->serverMainThread)
+				CloseHandle(this->serverMainThread);
+			if (this->serverReceivingThread)
+				CloseHandle(this->serverReceivingThread);
+			CloseHandle(this->controlMessagesResourceCount);
+			CloseHandle(this->pausedStateSem);
+
+			DeleteCriticalSection(&this->controlMessagesCriticalSection);
 		}
 		
 		///<summary>Attempts to create a PlaybackServer instance and returns an error code if it could not. fillServer is filled with NULL if creation fails.</summary>

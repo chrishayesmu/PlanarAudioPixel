@@ -48,15 +48,20 @@ namespace Networking {
 
 		// Control message queue
 		std::queue<PlaybackServerRequest> controlMessages;
+		CRITICAL_SECTION controlMessagesCriticalSection;
+		HANDLE controlMessagesResourceCount;
 
 		// Main receiving socket
 		Socket* socket;
 
 		// Maintains the servers current state. Initial state is STOPPED.
 		PlaybackServerState state;
+		HANDLE serverMainThread, serverReceivingThread;
+		HANDLE pausedStateSem;
 
-		//Default constructor
+		//Construction/destruction
 		PlaybackServer();
+		~PlaybackServer();
 
 		///<summary>Receives information from a client and stores it in the client information list.</summary>
 		///<param name="data">The datagram data.</param>
@@ -123,12 +128,21 @@ namespace Networking {
 		///<summary>Handles network communications and hands off incoming packets to dispatchNetworkMessage().</summary>
 		void serverReceive();
 		///<summary>Multithreaded router function that calls serverReceieve().</summary>
-		static DWORD __cdecl serverRouteReceive(void* server);
+		static DWORD __stdcall serverRouteReceive(void* server);
 
 		///<summary>Handles server management and control messages.</summary>
 		void serverMain();
 		///<summary>Multithreaded router function that calls serverMain().</summary>
-		static DWORD __cdecl serverRouteMain(void* server);
+		static DWORD __stdcall serverRouteMain(void* server);
+
+		///<summary>Queues up a request code to be handled by serverMain().</summary>
+		///<param name="code">The request code.</param>
+		void queueRequest(PlaybackServerRequestCode code);
+		
+		///<summary>Queues up a request code to be handled by serverMain().</summary>
+		///<param name="code">The request code.</param>
+		///<param name="requestData">Additional data required to complete the request.</param>
+		void queueRequest(PlaybackServerRequestCode code, PlaybackServerRequestData requestData);
 
 	public:
 
