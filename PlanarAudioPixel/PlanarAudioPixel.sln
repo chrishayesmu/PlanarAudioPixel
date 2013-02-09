@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Recording GUI 2", "Recordin
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pap-server-ffi", "pap-server-ffi\pap-server-ffi.vcxproj", "{CAFEE72A-A122-4E50-9579-0E3139356D9C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlaybackServerTest", "PlaybackServerTest\PlaybackServerTest.csproj", "{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +73,16 @@ Global
 		{CAFEE72A-A122-4E50-9579-0E3139356D9C}.Release|Mixed Platforms.Build.0 = Release|Win32
 		{CAFEE72A-A122-4E50-9579-0E3139356D9C}.Release|Win32.ActiveCfg = Release|Win32
 		{CAFEE72A-A122-4E50-9579-0E3139356D9C}.Release|Win32.Build.0 = Release|Win32
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|Win32.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
