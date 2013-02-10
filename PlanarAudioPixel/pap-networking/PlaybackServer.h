@@ -8,7 +8,6 @@ namespace Networking {
 	///<summary>A set of PlaybackServer states.</summary>
 	enum PlaybackServerStates {
 		PlaybackServer_RUNNING = 1,
-		PlaybackServer_PAUSED = 2,
 		PlaybackServer_STOPPED = 3
 	};
 	typedef PlaybackServerStates PlaybackServerState;
@@ -16,7 +15,9 @@ namespace Networking {
 	///<summary>A set of PlaybackServer error codes for the return values of certain functions.</summary>
 	enum PlaybackServerErrorCodes {
 		PlaybackServer_OK = 0,
-		PlaybackServer_INVALID = 1
+		PlaybackServer_INVALID = 1,
+		PlaybackServer_FILE = 2,
+		PlaybackServer_POINTER = 3
 	};
 	typedef PlaybackServerErrorCodes PlaybackServerErrorCode;
 
@@ -28,8 +29,10 @@ namespace Networking {
 
 		///<summary>Used to identify a control message.</summary>
 		enum PlaybackServerRequestCodes {
+			PlaybackServer_PLAY,
 			PlaybackServer_PAUSE,
-			PlaybackServer_STOP //,
+			PlaybackServer_STOP,
+			PlaybackServer_NEW_TRACK //,
 			//PlaybackServer_Seek,
 			//PlaybackServer_Restart, etc.
 		};
@@ -37,6 +40,11 @@ namespace Networking {
 
 		///<summary>Used to service particular control messages.</summary>
 		union PlaybackServerRequestData {
+			struct {
+				char audioFilename[256];
+				char positionFilename[256];
+				void (*callback)(int audioErrorCode, int positionErrorCode);
+			} newTrackInfo;
 			///time_t seekTo;
 		};
 
@@ -57,7 +65,6 @@ namespace Networking {
 		// Maintains the servers current state. Initial state is STOPPED.
 		PlaybackServerState state;
 		HANDLE serverMainThread, serverReceivingThread;
-		HANDLE pausedStateSem;
 
 		// Track buffer object
 		TrackBuffer tracks;
@@ -94,25 +101,22 @@ namespace Networking {
 		/// clients have moved, join, or dropped out, and that the volume must therefore be recalculated.</summary>
 		void clientPositionsChanged();
 
-		///<summary>Spawns a new thread to process audio and positional data. The thread will automatically
-		/// terminate itself when finished.</summary>
+		///<summary>Adds the file names to a new track server request to be handled by serverMain().</summary>
 		///<param name="audioFilename">The name of the audio file.</summary>
 		///<param name="positionFilename">The name of the position information data file.</summary>
-		void processAudioFilesOnThread(char* audioFilename, char* positionFilename);
+		void processAudioFiles(char* audioFilename, char* positionFilename);
 
-		///<summary>Reads audio data from the file specified and returns it as an array.</summary>
+		///<summary>Reads audio data from the file and fills an AudioBuffer.</summary>
 		///<param name="filename">The name of the audio file.</param>
-		///<param name="data">A pointer which will be filled with the address of the audio data array.</param>
-		///<param name="size">A pointer which will be filled with the number of elements in the audio data array.</param>
+		///<param name="buffer">The buffer to fill.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int readAudioDataFromFile(char* filename, AudioSample** data, int* size);
+		int readAudioDataFromFile(char* filename, AudioBuffer& buffer);
 
-		///<summary>Reads position data from the file specified and returns it as an array.</summary>
+		///<summary>Reads position data from the file and fills a PositionBuffer.</summary>
 		///<param name="filename">The name of the position data file.</param>
-		///<param name="data">A pointer which will be filled with the address of the position data array.</param>
-		///<param name="size">A pointer which will be filled with the number of elements in the position data array.</param>
+		///<param name="buffer">The buffer to fill.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int readPositionDataFromFile(char* filename, PositionInfo** data, int* size);
+		int readPositionDataFromFile(char* filename, PositionBuffer& buffer);
 
 		///<summary>Broadcasts an audio sample to the client network.</summary>
 		///<param name="sampleBuffer">The sample data.</param>
@@ -162,6 +166,10 @@ namespace Networking {
 		///<summary>Attempts to start the PlaybackServer.</summary>
 		///<returns>A PlaybackServerState code indicating the state of this call. If the state is not RUNNING, an error code is returned.</returns>
 		int Start();
+
+		///<summary>Attempts to start playback.</summary>
+		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+		int Play();
 
 	};
 

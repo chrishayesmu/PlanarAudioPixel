@@ -77,9 +77,6 @@ namespace Networking
 	// clients to be played.
 	struct AudioSample 
 	{
-		// The ID of the track to which this sample belongs.
-		trackid_t TrackID;
-
 		// The ID of the sample.
 		sampleid_t SampleID;
 
@@ -115,17 +112,27 @@ namespace Networking
 	// maps between ClientGUIDs and VolumeInfo objects.
 	typedef std::map<sampleid_t, std::map<ClientGUID, VolumeInfo>> VolumeBuffer;
 
+	// A typedef for a PositionBuffer object, which is a map from sample IDs to
+	// PositionInfo objects
+	typedef std::map<sampleid_t, PositionInfo> PositionBuffer;
+
 	// A structure containing information regarding a particular track.
 	struct TrackInfo {
 
-		// The ID of the track
+		// The ID of the track.
 		trackid_t TrackID;
 
-		// The number of samples this track contains.
-		unsigned int SampleCount;
+		// Where this track is in its playback, in microseconds.
+		time_t currentPlaybackOffset;
 
+		// The length, in microseconds, of this track.
+		time_t trackLength;
+		
 		// A buffer for the raw audio data for this track.
 		AudioBuffer audioData;
+
+		// A buffer for the position data for each sample.
+		PositionBuffer positionData;
 
 		// A buffer for the volume data for this track.
 		VolumeBuffer volumeData;

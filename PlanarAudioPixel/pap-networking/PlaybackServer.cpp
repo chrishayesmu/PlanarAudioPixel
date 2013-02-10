@@ -43,33 +43,113 @@ namespace Networking {
 		void PlaybackServer::clientPositionsChanged() {
 
 		}
-
-		///<summary>Spawns a new thread to process audio and positional data. The thread will 
-		/// automatically terminate itself when finished.</summary>
+		
+		///<summary>Adds the file names to a new track server request to be handled by serverMain().</summary>
 		///<param name="audioFilename">The name of the audio file.</param>
 		///<param name="positionFilename">The name of the position information data file.</param>
-		void PlaybackServer::processAudioFilesOnThread(char* audioFilename, char* positionFilename) {
-
+		void PlaybackServer::processAudioFiles(char* audioFilename, char* positionFilename) {
+			PlaybackServerRequestData data;
+			strcpy(data.newTrackInfo.audioFilename, audioFilename);
+			strcpy(data.newTrackInfo.positionFilename, positionFilename);
+			this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK, data);
 		}
 
-		///<summary>Reads audio data from the file specified and returns it as an array.</summary>
+		
+		///<summary>Reads audio data from the file and fills an AudioBuffer.</summary>
 		///<param name="filename">The name of the audio file.</param>
-		///<param name="data">A pointer which will be filled with the address of the audio data array.</param>
-		///<param name="size">A pointer which will be filled with the number of elements in the audio data array.</param>
+		///<param name="buffer">The buffer to fill.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::readAudioDataFromFile(char* filename, AudioSample** data, int* size) {
+		int PlaybackServer::readAudioDataFromFile(char* filename, AudioBuffer& buffer){
+			if (!filename) return PlaybackServerErrorCodes::PlaybackServer_POINTER;
 
-			return NULL;
+			//Attempt to open the file
+			FILE* audioFile = fopen(filename, "rb");
+			if (!audioFile) return PlaybackServerErrorCodes::PlaybackServer_FILE;
+
+			//File reading buffer
+			char readBuffer[4096];
+			int readCount = 0;
+
+			//Audio data struct setup
+			IO::AudioData audioData;
+
+			audioData.Data = (char*)malloc(sizeof(int) * 400 * 300);
+			audioData.DataLength = 400 * 300;
+			
+			//Number of bytes a sample needs
+			int bufferNeeds = 400 * 300 * sizeof(int);
+
+			//Time counter
+			time_t playbackOffset = 0;
+
+			do {
+				//Read 4096 bytes
+				readCount = fread(readBuffer, 1, 4096, audioFile);
+				if (!readCount) break;
+
+				//Copy memory as appropriate
+				if (bufferNeeds > readCount)
+					memcpy(audioData.Data, readBuffer, 4096);
+				else {
+					memcpy(audioData.Data, readBuffer, bufferNeeds);
+
+					AudioSample sample;
+					sample.SampleID = buffer.size();
+					sample.TimeOffset = playbackOffset;
+					playbackOffset += 100000;
+					sample.Data = audioData;
+
+					buffer[buffer.size()] = sample;
+
+					audioData.Data = (char*)malloc(sizeof(int) * 400 * 300);
+					audioData.DataLength = 400 * 300;
+
+					memcpy(audioData.Data, readBuffer, readCount - bufferNeeds);
+
+					bufferNeeds = 400 * 300 * sizeof(int) - (readCount - bufferNeeds);
+				}
+
+			} while(readCount == 4096);
+
+			//When the data fits perfectly, the last malloc is frivilous
+			free(audioData.Data);
+
+			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}
 
-		///<summary>Reads position data from the file specified and returns it as an array.</summary>
+		///<summary>Reads position data from the file and fills a PositionBuffer.</summary>
 		///<param name="filename">The name of the position data file.</param>
-		///<param name="data">A pointer which will be filled with the address of the position data array.</param>
-		///<param name="size">A pointer which will be filled with the number of elements in the position data array.</param>
+		///<param name="buffer">The buffer to fill.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::readPositionDataFromFile(char* filename, PositionInfo** data, int* size) {
+		int PlaybackServer::readPositionDataFromFile(char* filename, PositionBuffer& buffer){
+			if (!filename) return PlaybackServerErrorCodes::PlaybackServer_POINTER;
 
-			return NULL;
+			//Attempt to open the file
+			FILE* audioFile = fopen(filename, "rb");
+			if (!audioFile) return PlaybackServerErrorCodes::PlaybackServer_FILE;
+
+			//File reading buffer
+			char readBuffer[4096];
+			int readCount = 0;
+
+			//PositionInfo struct setup
+			PositionInfo positionData;
+			
+			do {
+				//Read 4096 bytes
+				readCount = fread(readBuffer, 1, 4096, audioFile);
+				if (!readCount) break;
+				
+				//Process position data
+				for (int i = 0; i < readCount; i+=2*sizeof(float)){
+					positionData.x = *((float*)(&readBuffer[i]));
+					positionData.y = *((float*)(&readBuffer[i+sizeof(float)]));
+					buffer[buffer.size()] = positionData;
+				}
+
+			} while(readCount == 4096);
+			
+			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}
 
 		///<summary>Broadcasts an audio sample to the client network.</summary>
@@ -150,17 +230,6 @@ namespace Networking {
 				//Try to receive data for 100ms
 				int grams = this->socket->TryReceiveMessage(datagram, 1500, 100);
 
-				//Check the state of the server
-				if (this->state == PlaybackServerStates::PlaybackServer_PAUSED){
-					//If the server has been paused, wait to be signaled to start again.
-					WaitForSingleObject(this->pausedStateSem, INFINITE);
-
-					//If the server has been woken up from being paused by being stopped, continue and terminate.
-					if (this->state == PlaybackServerStates::PlaybackServer_STOPPED)
-						continue;
-				}
-
-
 				//If grams == SocketError_TIMEOUT, the receive timed out. If grams == SOCKET_ERROR, there was a different error that can be retrieved with WSAGetLastError().
 				if (grams > 0){
 					//Hand off the packet
@@ -178,6 +247,39 @@ namespace Networking {
 		
 		///<summary>Handles server management and control messages.</summary>
 		void PlaybackServer::serverMain(){
+
+			do {
+
+				//Wait for a control message resource
+				WaitForSingleObject(this->controlMessagesResourceCount, INFINITE);
+
+				//Pop it off the queue
+				EnterCriticalSection(&this->controlMessagesCriticalSection);
+					PlaybackServerRequest request = this->controlMessages.front();
+					this->controlMessages.pop();
+				LeaveCriticalSection(&this->controlMessagesCriticalSection);
+
+				switch (request.controlCode){
+
+					//Load a new track
+				case PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK:
+					TrackInfo newTrack;
+					newTrack.TrackID = this->tracks.size() + 1;
+					newTrack.currentPlaybackOffset = 0;
+					
+					//Read the audio file
+					this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioData);
+					//Read the position file
+					this->readPositionDataFromFile(request.controlData.newTrackInfo.positionFilename, newTrack.positionData);
+
+					//Set the length of the track
+					newTrack.trackLength = newTrack.audioData.size() * 100000;
+
+					break;
+
+				}
+
+			} while (this->state != PlaybackServerStates::PlaybackServer_STOPPED);
 
 		}
 		///<summary>Multithreaded router function that calls serverMain().</summary>
@@ -228,7 +330,6 @@ namespace Networking {
 			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
 			InitializeCriticalSection(&this->controlMessagesCriticalSection);
 			this->controlMessagesResourceCount = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
-			this->pausedStateSem = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
 		}
 
 		///<summary>Destructs a PlaybackServer object.</summary>
@@ -242,7 +343,6 @@ namespace Networking {
 			if (this->serverReceivingThread)
 				CloseHandle(this->serverReceivingThread);
 			CloseHandle(this->controlMessagesResourceCount);
-			CloseHandle(this->pausedStateSem);
 
 			DeleteCriticalSection(&this->controlMessagesCriticalSection);
 		}
@@ -309,19 +409,23 @@ namespace Networking {
 				return PlaybackServerStates::PlaybackServer_RUNNING;
 
 				break;
-			case PlaybackServerStates::PlaybackServer_PAUSED:
-
-				//Allow each thread to unpause.
-				ReleaseSemaphore(this->pausedStateSem, 2, NULL);
-				return PlaybackServerStates::PlaybackServer_RUNNING;
-
-				break;
 			}
 
 			//The server is not in a valid state.
 			return PlaybackServerErrorCodes::PlaybackServer_INVALID;
 		}
 		
+		///<summary>Attempts to start playback.</summary>
+		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+		int PlaybackServer::Play(){
+			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
+				return PlaybackServerErrorCodes::PlaybackServer_INVALID;
+
+			this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_PLAY);
+
+			return PlaybackServerErrorCodes::PlaybackServer_OK;
+		}
+
 		///<summary>Attempts to create a PlaybackServer instance and returns an error code if it could not. fillServer is filled with NULL if creation fails.</summary>
 		///<param name="fillServer">A reference to the PlaybackServer object to fill.</param>
 		///<returns>A Networking::SocketErrorCode.</returns>
