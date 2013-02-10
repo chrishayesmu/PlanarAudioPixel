@@ -48,19 +48,33 @@ namespace Networking
 	// Client Information Table.
 	struct ClientGUID
 	{
-		IP_Address BroadcastIP;
-		IP_Address LocalIP;
+		union {
+			struct {
+				IP_Address BroadcastIP;
+				IP_Address LocalIP;
+			};
+			unsigned __int64 ID;
+		};
+
+		bool operator < (const ClientGUID& ID) const;
 	};
 
 	// A structure for representing a client's position and networking information.
 	// Defined in section 3.1 of the PAP document.
 	struct Client
 	{
-		// The broadcast IP of the client, generally the IP of the client's router or network switch.
-		IP_Address BroadcastIP;
 
-		// The local IP of the client, generally the internal IP of the client on its network.
-		IP_Address LocalIP;
+		// A union combining the BroadcastIP and LocalIP as a ClientGUID.
+		union {
+			struct {
+				// The broadcast IP of the client, generally the IP of the client's router or network switch.
+				IP_Address BroadcastIP;
+
+				// The local IP of the client, generally the internal IP of the client on its network.
+				IP_Address LocalIP;
+			};
+			ClientGUID ClientID;
+		};
 
 		// The client's position in the grid, stored as an offset from the top-left corner of the grid,
 		// which has position (0, 0).

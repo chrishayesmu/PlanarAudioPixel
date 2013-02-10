@@ -10,6 +10,36 @@ namespace Networking {
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::receiveClientConnection(char* data, int dataSize) {
 
+			//Acquire the client's broadcast IP and the client's locally unique ID.
+			ClientGUID clientID;
+			IP_Address BroadcastIP = *((IP_Address*)(data + 1));
+			data += sizeof(IP_Address) + 1;
+			IP_Address LocalIP = *((IP_Address*)(data + 1));
+			data += sizeof(IP_Address);
+
+			clientID.BroadcastIP = BroadcastIP;
+			clientID.LocalIP = LocalIP;
+
+			//Acquire the client's position;
+			PositionInfo clientPosition = *((PositionInfo*)(data));
+			data += sizeof(PositionInfo);
+
+			//Build the client
+			Client client;
+			client.ClientID = clientID;
+			client.Offset = clientPosition;
+			client.LastCheckInTime = getMicroseconds();
+			
+			//Add the client to the information table
+			Networking::ClientInformationTable[clientID] = client;
+
+		}
+
+		///<summary>Updates the client information table for the client that sent the check in.</summary>
+		///<param name="data">The datagram data.</param>
+		///<param name="dataSize">The number of bytes in the datagram.</param>
+		void PlaybackServer::receiveClientCheckIn(char* data, int dataSize) {
+
 		}
 
 		///<summary>Responds to a delay request sent by a client.</summary>
@@ -29,13 +59,6 @@ namespace Networking {
 		///<param name="data">The datagram data.</summary>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::resendVolume(char* data, int dataSize){
-
-		}
-
-		///<summary>Updates the client information table for the client that sent the check in.</summary>
-		///<param name="data">The datagram data.</param>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::receiveClientCheckIn(char* data, int dataSize) {
 
 		}
 

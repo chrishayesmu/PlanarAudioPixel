@@ -18,4 +18,7 @@ namespace Networking
 
 	// The port number on which to run network communications between the server and client.
 	extern unsigned short NetworkPort;
+
+	// Gets the current system time as a count of microseconds.
+	time_t getMicroseconds();
 }

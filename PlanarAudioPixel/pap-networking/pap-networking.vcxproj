@@ -73,6 +73,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="NetworkGlobals.cpp" />
+    <ClCompile Include="NetworkStructures.cpp" />
     <ClCompile Include="PlaybackServer.cpp" />
     <ClCompile Include="Socket.cpp" />
   </ItemGroup>
