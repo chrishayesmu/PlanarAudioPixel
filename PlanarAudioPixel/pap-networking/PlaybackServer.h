@@ -75,34 +75,35 @@ namespace Networking {
 		typedef std::map<sampleid_t, unsigned int>::iterator SampleID_UInt_I;
 		std::map<sampleid_t, unsigned int> sampleReceivedCounts;
 		std::map<sampleid_t, unsigned int> volumeReceivedCounts;
+		bool initialBuffering;
 
 		//Construction/destruction
 		PlaybackServer();
 		~PlaybackServer();
 
 		///<summary>Receives information from a client and stores it in the client information list.</summary>
-		///<param name="data">The datagram data.</param>
+		///<param name="data">The message data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void receiveClientConnection(char* data, int dataSize);
+		void receiveClientConnection(const PacketStructures::NetworkMessage* message, int dataSize);
 
 		///<summary>Responds to a delay request sent by a client.</summary>
 		///<param name="clientID">The ID of the client to send the response to.</param>
 		void sendDelayResponseMessage(ClientGUID clientID);
 
 		///<summary>Responds to an audio data resend request.</summary>
-		///<param name="data">The datagram data.</summary>
+		///<param name="data">The message data.</summary>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void resendAudio(char* data, int dataSize);
+		void resendAudio(const PacketStructures::NetworkMessage* message, int dataSize);
 
 		///<summary>Responds to a volume data resend request.</summary>
-		///<param name="data">The datagram data.</summary>
+		///<param name="data">The message data.</summary>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void resendVolume(char* data, int dataSize);
+		void resendVolume(const PacketStructures::NetworkMessage* message, int dataSize);
 
 		///<summary>Updates the client information table for the client that sent the check in.</summary>
-		///<param name="data">The datagram data.</summary>
+		///<param name="data">The message data.</summary>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void receiveClientCheckIn(char* data, int dataSize);
+		void receiveClientCheckIn(const PacketStructures::NetworkMessage* message, int dataSize);
 
 		///<summary>This function will be called in order to notify the server that one or more 
 		/// clients have moved, join, or dropped out, and that the volume must therefore be recalculated.</summary>
@@ -143,9 +144,9 @@ namespace Networking {
 		int sendVolumeData(sampleid_t sampleID, trackid_t trackID, char* volumeDataBuffer, int bufferSize);
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
-		///<param name="datagram">The datagram data.</param>
+		///<param name="datagram">The network message.</param>
 		///<param name="datagramSize">The size of the datagram.</param>
-		void dispatchNetworkMessage(char* datagram, int datagramSize);
+		void dispatchNetworkMessage(const PacketStructures::NetworkMessage* message, int datagramSize);
 		
 		///<summary>Handles network communications and hands off incoming packets to dispatchNetworkMessage().</summary>
 		void serverReceive();

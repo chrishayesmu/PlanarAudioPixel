@@ -25,6 +25,12 @@ namespace Networking
 	// The number of sample to buffer while playing
 	extern unsigned int ContinuousBufferCount;
 
+	// The number of microseconds to wait for a resend request before assuming that a client has received a packet during initial buffering
+	extern time_t ClientReceivedPacketTimeout;
+
 	// Gets the current system time as a count of microseconds.
 	time_t getMicroseconds();
+
+	// Performs a spin wait for the specified number of microseconds. Exact microsecond accuracy is not super important here.
+	void busyWait(time_t us);
 }

@@ -15,6 +15,8 @@ namespace Networking
 
 	unsigned int ContinuousBufferCount = 10;
 
+	time_t ClientReceivedPacketTimeout = 20000;
+
 	time_t getMicroseconds(){
 		FILETIME time;
 		GetSystemTimePreciseAsFileTime(&time);
@@ -22,5 +24,11 @@ namespace Networking
 		lTime.LowPart = time.dwLowDateTime;
 		lTime.HighPart = time.dwHighDateTime;
 		return (lTime.QuadPart / 10);
+	}
+	
+	// Performs a spin wait for the specified number of microseconds. Exact microsecond accuracy is not super important here. It is, however, at the very least accurate to the millisecond.
+	void busyWait(time_t us){
+		us += getMicroseconds();
+		while (getMicroseconds() < us);
 	}
 }

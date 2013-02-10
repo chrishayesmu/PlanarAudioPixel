@@ -9,9 +9,11 @@
 
 #include <map>
 #include "../pap-file-io/IOStructures.h"
+#include "ControlByteConstants.h"
 
 namespace Networking
 {
+	
 	// A structure for representing IP addresses, as either a 4-byte integer
 	// or as 4 separate bytes, for convenience.
 	union IP_Address
@@ -84,7 +86,7 @@ namespace Networking
 		time_t LastCheckInTime;
 	};
 
-	typedef unsigned char trackid_t;
+	typedef unsigned int trackid_t;
 	typedef unsigned int sampleid_t;
 
 	// A structure containing the information regarding an audio sample that is sent to
@@ -159,5 +161,71 @@ namespace Networking
 	// A typedef for a TrackBuffer object, which is a map between track IDs and
 	// TrackInfo objects
 	typedef std::map<trackid_t, TrackInfo> TrackBuffer;
+
+	
+	namespace PacketStructures {
+
+		// [32] Represents a network packet.
+		struct NetworkMessage {
+			
+			// Every message on our network contains a control control byte
+			/* [1] */ controlcode_t ControlByte;
+			/* [7] explicit padding */ unsigned char _pad[7];
+
+			// Message headers
+			union {
+
+				// [16] Client to Server - Connection notification
+				struct {
+					// The ID and position of the client
+					/* [8] */ ClientGUID clientID;
+					/* [8] */ PositionInfo position;
+				} ClientConnection;
+
+				// [16] Client to Server - Check-in
+				struct {
+					// The ID and position of the client
+					/* [8] */ ClientGUID clientID;
+					/* [8] */ PositionInfo position;
+				} ClientCheckIn;
+				
+				// [16] Server to Clients - Audio sample header
+				struct {
+					/* [4] */ trackid_t TrackID;
+					/* [4] */ sampleid_t SampleID;
+					/* [8] explicit padding */ unsigned char _pad[8];
+				} AudioSample;
+				
+				// [16] Client to Server - Audio sample resend request
+				struct {
+					// The ID of the track and the ID of the sample that is to be resent
+					/* [4] */ trackid_t TrackID;
+					/* [4] */ sampleid_t SampleID;
+					/* [8] explicit padding */ unsigned char _pad[8];
+				} AudioResendRequest;
+				
+				// [16] Server to Clients - Volume sample header
+				struct {
+					/* [4] */ trackid_t TrackID;
+					/* [4] */ sampleid_t SampleID;
+					/* [8] explicit padding */ unsigned char _pad[8];
+				} VolumeSample;
+				
+				// [16] Client to Server - Audio sample resend request
+				struct {
+					// The ID of the track and the ID of the sample that is to be resent
+					/* [4] */ trackid_t TrackID;
+					/* [4] */ sampleid_t SampleID;
+					/* [8] explicit padding */ unsigned char _pad[8];
+				} VolumeResendRequest;
+
+			};
+
+			// If extra data exists, it starts here.
+			char data[8];
+
+		};
+
+	};
 
 }

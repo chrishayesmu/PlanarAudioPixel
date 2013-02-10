@@ -6,60 +6,28 @@
 namespace Networking {
 		
 		///<summary>Receives information from a client and stores it in the client information list.</summary>
-		///<param name="data">The datagram data.</param>
+		///<param name="message">The message data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::receiveClientConnection(char* data, int dataSize) {
+		void PlaybackServer::receiveClientConnection(const PacketStructures::NetworkMessage* message, int dataSize) {
 			
-			data[dataSize] = 0;
-
-			//Acquire the client's broadcast IP and the client's locally unique ID.
-			ClientGUID clientID;
-			IP_Address BroadcastIP = *((IP_Address*)(data + 1));
-			data += sizeof(IP_Address) + 1;
-			IP_Address LocalIP = *((IP_Address*)(data + 1));
-			data += sizeof(IP_Address);
-
-			clientID.BroadcastIP = BroadcastIP;
-			clientID.LocalIP = LocalIP;
-
-			//Acquire the client's position;
-			PositionInfo clientPosition;
-			sscanf(data, "%f%f", &clientPosition.x, &clientPosition.y);
-
 			//Build the client
 			Client client;
-			client.ClientID = clientID;
-			client.Offset = clientPosition;
+			client.ClientID = message->ClientConnection.clientID;
+			client.Offset = message->ClientConnection.position;
 			client.LastCheckInTime = getMicroseconds();
 			
 			//Add the client to the information table
-			Networking::ClientInformationTable[clientID] = client;
+			Networking::ClientInformationTable[client.ClientID] = client;
 
 		}
 
 		///<summary>Updates the client information table for the client that sent the check in.</summary>
-		///<param name="data">The datagram data.</param>
+		///<param name="message">The message data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::receiveClientCheckIn(char* data, int dataSize) {
-
-			data[dataSize] = 0;
-
-			//Acquire the client's broadcast IP and the client's locally unique ID.
-			ClientGUID clientID;
-			IP_Address BroadcastIP = *((IP_Address*)(data + 1));
-			data += sizeof(IP_Address) + 1;
-			IP_Address LocalIP = *((IP_Address*)(data + 1));
-			data += sizeof(IP_Address);
-
-			clientID.BroadcastIP = BroadcastIP;
-			clientID.LocalIP = LocalIP;
+		void PlaybackServer::receiveClientCheckIn(const PacketStructures::NetworkMessage* message, int dataSize) {
 			
-			//Acquire the client's position;
-			PositionInfo clientPosition;
-			sscanf(data, "%f%f", &clientPosition.x, &clientPosition.y);
-
 			//Update the timestamp
-			Networking::ClientInformationTable[clientID].LastCheckInTime = getMicroseconds();
+			Networking::ClientInformationTable[message->ClientConnection.clientID].LastCheckInTime = getMicroseconds();
 
 			//TODO: Check if the position changed.
 
@@ -72,16 +40,16 @@ namespace Networking {
 		}
 
 		///<summary>Responds to an audio data resend request.</summary>
-		///<param name="data">The datagram data.</param>
+		///<param name="message">The message data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::resendAudio(char* data, int dataSize) {
+		void PlaybackServer::resendAudio(const PacketStructures::NetworkMessage* message, int dataSize) {
 
 		}
 
 		///<summary>Responds to a volume data resend request.</summary>
-		///<param name="data">The datagram data.</summary>
+		///<param name="message">The message data.</summary>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::resendVolume(char* data, int dataSize){
+		void PlaybackServer::resendVolume(const PacketStructures::NetworkMessage* message, int dataSize){
 
 		}
 
@@ -203,7 +171,7 @@ namespace Networking {
 		///<param name="bufferIDStart">The ID of the first sample in the buffer range currently being delivered.</param>
 		///<param name="bufferIDEnd">The ID of the last sample in the buffer range currently being delivered.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int sendAudioSample(AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd){
+		int PlaybackServer::sendAudioSample(AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd){
 
 			return E_FAIL;
 		}
@@ -220,31 +188,36 @@ namespace Networking {
 		}
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
-		///<param name="datagram">The datagram data.</param>
+		///<param name="message">The network message.</param>
 		///<param name="datagramSize">The size of the datagram.</param>
-		void PlaybackServer::dispatchNetworkMessage(char* datagram, int datagramSize) {
+		void PlaybackServer::dispatchNetworkMessage(const PacketStructures::NetworkMessage* message, int datagramSize) {
 			
 			//switch on the control byte
-			switch (datagram[0]){
+			switch (message->ControlByte){
 			
 				//A new connection.
 			case Networking::ControlBytes::NEW_CONNECTION:
-				this->receiveClientConnection(datagram, datagramSize);
+				this->receiveClientConnection(message, datagramSize);
 				break;
 
 				//A client check-in.
 			case Networking::ControlBytes::PERIODIC_CHECK_IN:
-				this->receiveClientCheckIn(datagram, datagramSize);
+				this->receiveClientCheckIn(message, datagramSize);
 				break;
 
 				//A client requesting an audio resend for a dropped packet.
 			case Networking::ControlBytes::RESEND_AUDIO:
-				this->resendAudio(datagram, datagramSize);
+				if (!this->initialBuffering)
+					this->resendAudio(message, datagramSize);
+				else {
+
+					
+				}
 				break;
 
 				//A client requesting a volume resend for a dropped packet.
 			case Networking::ControlBytes::RESEND_VOLUME:
-				this->resendAudio(datagram, datagramSize);
+				this->resendAudio(message, datagramSize);
 				break;
 
 				//A pause-playback acknowledgement.
@@ -270,17 +243,20 @@ namespace Networking {
 		void PlaybackServer::serverReceive(){
 
 			//Receive data buffer
-			char datagram[1500];
+			struct {
+				PacketStructures::NetworkMessage message;
+				char data[1500-32];
+			} NetworkPacket;
 
 			while (this->state != PlaybackServerStates::PlaybackServer_STOPPED){
 
 				//Try to receive data for 100ms
-				int grams = this->recvSocket->TryReceiveMessage(datagram, 1500, 100);
+				int grams = this->recvSocket->TryReceiveMessage((char*)&NetworkPacket, 1500, 100);
 
 				//If grams == SocketError_TIMEOUT, the receive timed out. If grams == SOCKET_ERROR, there was a different error that can be retrieved with WSAGetLastError().
 				if (grams > 0){
 					//Hand off the packet
-					this->dispatchNetworkMessage(datagram, grams);
+					this->dispatchNetworkMessage(&NetworkPacket.message, grams);
 				}
 
 			}
@@ -318,6 +294,9 @@ namespace Networking {
 					//Play all tracks. This code path is only taken if the playback state is STOPPED. Otherwise, RESUME is taken.
 				case PlaybackServerRequestCodes::PlaybackServer_PLAY:
 
+					//Indicate that this is the initial buffering phase
+					this->initialBuffering = true;
+
 					//Acquire a local copy of the list of clients
 					clients = ClientInformationTable;
 
@@ -332,7 +311,7 @@ namespace Networking {
 					//and ensure that they arrive.
 					for (unsigned int i = 0; i < tracks.size(); ++i) {
 
-						int trackBufferSize = min(tracks[i].audioSamples.size(), RequiredBufferedSamplesCount);
+						unsigned int trackBufferSize = min(tracks[i].audioSamples.size(), RequiredBufferedSamplesCount);
 
 						this->sampleReceivedCounts.clear();
 						this->volumeReceivedCounts.clear();
@@ -347,11 +326,20 @@ namespace Networking {
 							//Iterate over the keys left in sampleReceivedCounts (those are the sampleid_t's of the samples that haven't successfully buffered),
 							//and attempt to buffer them.
 							for (SampleID_UInt_I j = this->sampleReceivedCounts.begin(); j != this->sampleReceivedCounts.end(); ++j){
-								//this->sendAudioSample(tracks[i].audioSamples[j->first]);
+								this->sendAudioSample(tracks[i].audioSamples[j->first], 0, trackBufferSize);
 							}
+
+							samplesBuffered = true;
+							
+							//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
+							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
+
+
 						} while (!samplesBuffered);
 
 					}
+
+					this->initialBuffering = false;
 
 					break;
 
@@ -424,6 +412,7 @@ namespace Networking {
 			this->serverMainThread = NULL;
 			this->serverReceivingThread = NULL;
 			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
+			this->initialBuffering = false;
 			InitializeCriticalSection(&this->controlMessagesCriticalSection);
 			this->controlMessagesResourceCount = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
 		}

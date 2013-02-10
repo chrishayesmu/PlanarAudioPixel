@@ -6,8 +6,13 @@
 // Author: Chris Hayes
 // -----------------------------------------------------------------
 
+#pragma once
+
 namespace Networking
 {
+
+	typedef unsigned char controlcode_t;
+
 	namespace ControlBytes {
 		// Packet identifier that is sent when a client requests to establish a connection, 
 		// or when the server accepts the connection.

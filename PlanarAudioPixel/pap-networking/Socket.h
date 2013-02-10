@@ -154,7 +154,7 @@ namespace Networking {
 	
 		///<summary>Attempts to recieve a message for the specified number of milliseconds.</summary>
 		///<param name="buffer">The buffer in which to store the received message.</param>
-		///<param name="buffersize">The maximum length of the buffer.<param>
+		///<param name="buffersize">The maximum length of the buffer.</param>
 		///<param name="msCount">The number of milliseconds to wait for the socket to have data available.</param>
 		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function. Timeout can be checked with the SOCKETTIMEOUT(x) macro.</returns>
 		int TryReceiveMessage(char* buffer, int buffersize, time_t msCount);

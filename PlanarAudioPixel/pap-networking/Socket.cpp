@@ -159,7 +159,7 @@ namespace Networking {
 	
 	///<summary>Blocking call that receives a message on this socket.</summary>
 	///<param name="buffer">The buffer in which to store the received message.</param>
-	///<param name="buffersize">The maximum length of the buffer.<param>
+	///<param name="buffersize">The maximum length of the buffer.</param>
 	///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
 	int Socket::TryReceiveMessage(char* buffer, int buffersize, time_t msCount){
 		return this->TryReceiveMessage(buffer, buffersize, msCount, NULL, NULL);
