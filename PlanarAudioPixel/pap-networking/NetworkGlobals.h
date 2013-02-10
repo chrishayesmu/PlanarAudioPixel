@@ -19,6 +19,12 @@ namespace Networking
 	// The port number on which to run network communications between the server and client.
 	extern unsigned short NetworkPort;
 
+	// The number of samples to buffer before initiating transport controls.
+	extern unsigned int RequiredBufferedSamplesCount;
+
+	// The number of sample to buffer while playing
+	extern unsigned int ContinuousBufferCount;
+
 	// Gets the current system time as a count of microseconds.
 	time_t getMicroseconds();
 }

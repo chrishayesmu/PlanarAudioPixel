@@ -32,6 +32,7 @@ namespace Networking {
 			PlaybackServer_PLAY,
 			PlaybackServer_PAUSE,
 			PlaybackServer_STOP,
+			PlaybackServer_BUFFER,
 			PlaybackServer_NEW_TRACK //,
 			//PlaybackServer_Seek,
 			//PlaybackServer_Restart, etc.
@@ -45,6 +46,7 @@ namespace Networking {
 				char positionFilename[256];
 				void (*callback)(int audioErrorCode, int positionErrorCode);
 			} newTrackInfo;
+			void (*bufferingCallback)(float percentBuffered);
 			///time_t seekTo;
 		};
 
@@ -60,7 +62,7 @@ namespace Networking {
 		HANDLE controlMessagesResourceCount;
 
 		// Main receiving socket
-		Socket* socket;
+		Socket* recvSocket, * sendSocket;
 
 		// Maintains the servers current state. Initial state is STOPPED.
 		PlaybackServerState state;
@@ -68,6 +70,11 @@ namespace Networking {
 
 		// Track buffer object
 		TrackBuffer tracks;
+
+		// Used to ensure delivery of the initial buffering samples
+		typedef std::map<sampleid_t, unsigned int>::iterator SampleID_UInt_I;
+		std::map<sampleid_t, unsigned int> sampleReceivedCounts;
+		std::map<sampleid_t, unsigned int> volumeReceivedCounts;
 
 		//Construction/destruction
 		PlaybackServer();
@@ -118,11 +125,14 @@ namespace Networking {
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
 		int readPositionDataFromFile(char* filename, PositionBuffer& buffer);
 
+		//## Possibly add an RTT field to the Client structure and periodically send RTT tracking requests. Then use it 
+		//## to send an accurate expected wait time to a Client for receiving all samples in a buffer range.
 		///<summary>Broadcasts an audio sample to the client network.</summary>
 		///<param name="sampleBuffer">The sample data.</param>
-		///<param name="sampleSize">The size of the sample data.</param>
+		///<param name="bufferIDStart">The ID of the first sample in the buffer range currently being delivered.</param>
+		///<param name="bufferIDEnd">The ID of the last sample in the buffer range currently being delivered.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int sendAudioSample(AudioSample sampleBuffer, int sampleSize);
+		int sendAudioSample(AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd);
 
 		///<summary>Broadcasts volume information for the client network.</summary>
 		///<param name="sampleID">The ID of the sample to which this bit of volume data applies.</param>

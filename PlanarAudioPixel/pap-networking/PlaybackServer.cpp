@@ -61,6 +61,7 @@ namespace Networking {
 			//Update the timestamp
 			Networking::ClientInformationTable[clientID].LastCheckInTime = getMicroseconds();
 
+			//TODO: Check if the position changed.
 
 		}
 
@@ -199,9 +200,10 @@ namespace Networking {
 
 		///<summary>Broadcasts an audio sample to the client network.</summary>
 		///<param name="sampleBuffer">The sample data.</param>
-		///<param name="sampleSize">The size of the sample data.</param>
-		///<returns>Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::sendAudioSample(AudioSample sampleBuffer, int sampleSize) {
+		///<param name="bufferIDStart">The ID of the first sample in the buffer range currently being delivered.</param>
+		///<param name="bufferIDEnd">The ID of the last sample in the buffer range currently being delivered.</param>
+		///<returns>TODO: Integer return code specifying the result of the call.</returns>
+		int sendAudioSample(AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd){
 
 			return E_FAIL;
 		}
@@ -273,7 +275,7 @@ namespace Networking {
 			while (this->state != PlaybackServerStates::PlaybackServer_STOPPED){
 
 				//Try to receive data for 100ms
-				int grams = this->socket->TryReceiveMessage(datagram, 1500, 100);
+				int grams = this->recvSocket->TryReceiveMessage(datagram, 1500, 100);
 
 				//If grams == SocketError_TIMEOUT, the receive timed out. If grams == SOCKET_ERROR, there was a different error that can be retrieved with WSAGetLastError().
 				if (grams > 0){
@@ -304,21 +306,69 @@ namespace Networking {
 					this->controlMessages.pop();
 				LeaveCriticalSection(&this->controlMessagesCriticalSection);
 
+				//Play-Request variables
+				std::map<ClientGUID, Client> clients;
+				void (*bufferingCallback)(float percentBuffered);
+				int bufferMax = 0;
+				int bufferCount = 0;
+				//==============
+
 				switch (request.controlCode){
+
+					//Play all tracks. This code path is only taken if the playback state is STOPPED. Otherwise, RESUME is taken.
+				case PlaybackServerRequestCodes::PlaybackServer_PLAY:
+
+					//Acquire a local copy of the list of clients
+					clients = ClientInformationTable;
+
+					bufferingCallback = request.controlData.bufferingCallback;
+					
+					//Count the number of samples to buffer
+					for (unsigned int i = 0; i < tracks.size(); ++i){
+						bufferMax += min(tracks[i].audioSamples.size(), RequiredBufferedSamplesCount) * 2;
+					}
+
+					//Send the first RequiredBufferedSamplesCount samples and accompanying volume information
+					//and ensure that they arrive.
+					for (unsigned int i = 0; i < tracks.size(); ++i) {
+
+						int trackBufferSize = min(tracks[i].audioSamples.size(), RequiredBufferedSamplesCount);
+
+						this->sampleReceivedCounts.clear();
+						this->volumeReceivedCounts.clear();
+
+						for (unsigned int j = 0; j < trackBufferSize; ++j){
+							this->sampleReceivedCounts[j] = 0;
+							this->volumeReceivedCounts[j] = 0;
+						}
+
+						bool samplesBuffered = false;
+						do {
+							//Iterate over the keys left in sampleReceivedCounts (those are the sampleid_t's of the samples that haven't successfully buffered),
+							//and attempt to buffer them.
+							for (SampleID_UInt_I j = this->sampleReceivedCounts.begin(); j != this->sampleReceivedCounts.end(); ++j){
+								//this->sendAudioSample(tracks[i].audioSamples[j->first]);
+							}
+						} while (!samplesBuffered);
+
+					}
+
+					break;
 
 					//Load a new track
 				case PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK:
 					TrackInfo newTrack;
 					newTrack.TrackID = this->tracks.size() + 1;
 					newTrack.currentPlaybackOffset = 0;
+					newTrack.samplesBuffered = 0;
 					
 					//Read the audio file
-					this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioData);
+					this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioSamples);
 					//Read the position file
 					this->readPositionDataFromFile(request.controlData.newTrackInfo.positionFilename, newTrack.positionData);
 
 					//Set the length of the track
-					newTrack.trackLength = newTrack.audioData.size() * 100000;
+					newTrack.trackLength = newTrack.audioSamples.size() * 100000;
 
 					break;
 
@@ -369,7 +419,8 @@ namespace Networking {
 		
 		///<summary>Constructs a PlaybackServer object.</summary>
 		PlaybackServer::PlaybackServer() {
-			this->socket = NULL;
+			this->recvSocket = NULL;
+			this->sendSocket = NULL;
 			this->serverMainThread = NULL;
 			this->serverReceivingThread = NULL;
 			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
@@ -379,9 +430,13 @@ namespace Networking {
 
 		///<summary>Destructs a PlaybackServer object.</summary>
 		PlaybackServer::~PlaybackServer(){
-			if (this->socket){
-				delete this->socket;
-				this->socket = NULL;
+			if (this->recvSocket){
+				delete this->recvSocket;
+				this->recvSocket = NULL;
+			}
+			if (this->sendSocket){
+				delete this->sendSocket;
+				this->sendSocket = NULL;
 			}
 			if (this->serverMainThread)
 				CloseHandle(this->serverMainThread);
@@ -482,18 +537,28 @@ namespace Networking {
 
 			PlaybackServer* server = new PlaybackServer();
 
-			//Attempt to create the socket inside the Server
-			int socketCode = Socket::Create(&server->socket, Networking::SocketType::UDP, Networking::AddressFamily::IPv4);
-			if (SOCKETFAILED(socketCode)){
+			//Attempt to create the sendSocket inside the Server
+			int sendSocketCode = Socket::Create(&server->sendSocket, Networking::SocketType::UDP, Networking::AddressFamily::IPv4);
+			if (SOCKETFAILED(sendSocketCode)){
 				delete server;
-				return socketCode;
+				return sendSocketCode;
 			}
 
-			//Attempt to set the socket up for UDP receiving
-			socketCode = server->socket->PrepareUDPReceive(NetworkPort);
-			if (SOCKETFAILED(socketCode)){
+			//Set the sendSocket up for UDP broadcasting
+			server->sendSocket->PrepareUDPSend(NetworkPort, "127.0.0.1");
+
+			//Attempt to create the recvSocket inside the Server
+			int recvSocketCode = Socket::Create(&server->recvSocket, Networking::SocketType::UDP, Networking::AddressFamily::IPv4);
+			if (SOCKETFAILED(recvSocketCode)){
 				delete server;
-				return socketCode;
+				return recvSocketCode;
+			}
+
+			//Attempt to set the recvSocket up for UDP receiving
+			recvSocketCode = server->recvSocket->PrepareUDPReceive(NetworkPort);
+			if (SOCKETFAILED(recvSocketCode)){
+				delete server;
+				return recvSocketCode;
 			}
 
 			*fillServer = server;

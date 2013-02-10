@@ -81,7 +81,7 @@ namespace Networking
 		PositionInfo Offset;
 
 		// The 8-byte Unix timestamp of when the client last checked in with the server.
-		unsigned long LastCheckInTime;
+		time_t LastCheckInTime;
 	};
 
 	typedef unsigned char trackid_t;
@@ -141,12 +141,15 @@ namespace Networking
 
 		// The length, in microseconds, of this track.
 		time_t trackLength;
-		
-		// A buffer for the raw audio data for this track.
-		AudioBuffer audioData;
+
+		// The index of the last sample that was buffered
+		unsigned int samplesBuffered;
 
 		// A buffer for the position data for each sample.
 		PositionBuffer positionData;
+		
+		// A buffer for the raw audio data for this track.
+		AudioBuffer audioSamples;
 
 		// A buffer for the volume data for this track.
 		VolumeBuffer volumeData;

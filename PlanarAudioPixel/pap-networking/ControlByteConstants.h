@@ -19,10 +19,10 @@ namespace Networking
 		// Packet identifier that is sent when the client makes a periodic check-in with the server.
 		const unsigned char PERIODIC_CHECK_IN = 0x03;
 
-		// Packet identifier that is sent when the server sends audio data to a client.
+		// Packet identifier that is sent when the server sends audio data to a client
 		const unsigned char SENDING_AUDIO = 0x04;
 
-		// Packet identifier that is sent when the server sends volume data to a client.
+		// Packet identifier that is sent when the server sends volume data to a client
 		const unsigned char SENDING_VOLUME = 0x05;
 
 		// Packet identifier that is sent when a client needs to request a resending of audio data.

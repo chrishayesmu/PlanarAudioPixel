@@ -11,6 +11,10 @@ namespace Networking
 
 	unsigned short NetworkPort = 32746;
 
+	unsigned int RequiredBufferedSamplesCount = 150;
+
+	unsigned int ContinuousBufferCount = 10;
+
 	time_t getMicroseconds(){
 		FILETIME time;
 		GetSystemTimePreciseAsFileTime(&time);
