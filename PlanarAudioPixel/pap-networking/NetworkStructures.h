@@ -112,6 +112,28 @@ namespace Networking
 	typedef std::map<sampleid_t, AudioSample> AudioBuffer;
 
 	// A typedef for an VolumeBuffer object, which is a map between sample IDs and
-	// VolumeInfo objects.
-	typedef std::map<sampleid_t, VolumeInfo> VolumeBuffer;
+	// maps between ClientGUIDs and VolumeInfo objects.
+	typedef std::map<sampleid_t, std::map<ClientGUID, VolumeInfo>> VolumeBuffer;
+
+	// A structure containing information regarding a particular track.
+	struct TrackInfo {
+
+		// The ID of the track
+		trackid_t TrackID;
+
+		// The number of samples this track contains.
+		unsigned int SampleCount;
+
+		// A buffer for the raw audio data for this track.
+		AudioBuffer audioData;
+
+		// A buffer for the volume data for this track.
+		VolumeBuffer volumeData;
+
+	};
+
+	// A typedef for a TrackBuffer object, which is a map between track IDs and
+	// TrackInfo objects
+	typedef std::map<trackid_t, TrackInfo> TrackBuffer;
+
 }

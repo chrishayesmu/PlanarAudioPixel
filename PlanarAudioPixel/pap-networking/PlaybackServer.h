@@ -59,6 +59,9 @@ namespace Networking {
 		HANDLE serverMainThread, serverReceivingThread;
 		HANDLE pausedStateSem;
 
+		// Track buffer object
+		TrackBuffer tracks;
+
 		//Construction/destruction
 		PlaybackServer();
 		~PlaybackServer();
