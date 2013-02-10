@@ -143,8 +143,8 @@ namespace Networking {
 	///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
 	int Socket::TryReceiveMessage(char* buffer, int buffersize, time_t msCount, sockaddr_in* sender, int* senderSize){
 		struct timeval timeOut;
-		timeOut.tv_sec = msCount / 1000;
-		timeOut.tv_usec = (msCount - (timeOut.tv_sec * 1000)) * 1000;
+		timeOut.tv_sec = (long)(msCount / 1000);
+		timeOut.tv_usec = (long)((msCount - (timeOut.tv_sec * 1000)) * 1000);
 
 		fd_set fds;
 		fds.fd_count = 1;
@@ -154,7 +154,7 @@ namespace Networking {
 
 		if (s > 0)  return this->ReceiveMessage(buffer, buffersize, sender, senderSize);
 		if (s == 0) return Networking::SocketError_TIMEOUT;
-		if (s < 0)  return s;
+		return s;
 	}
 	
 	///<summary>Blocking call that receives a message on this socket.</summary>

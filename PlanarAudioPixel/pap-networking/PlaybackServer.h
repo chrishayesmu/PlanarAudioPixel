@@ -77,6 +77,11 @@ namespace Networking {
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void resendAudio(char* data, int dataSize);
 
+		///<summary>Responds to a volume data resend request.</summary>
+		///<param name="data">The datagram data.</summary>
+		///<param name="dataSize">The number of bytes in the datagram.</param>
+		void resendVolume(char* data, int dataSize);
+
 		///<summary>Updates the client information table for the client that sent the check in.</summary>
 		///<param name="data">The datagram data.</summary>
 		///<param name="dataSize">The number of bytes in the datagram.</param>

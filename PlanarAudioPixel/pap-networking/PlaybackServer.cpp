@@ -19,14 +19,21 @@ namespace Networking {
 		}
 
 		///<summary>Responds to an audio data resend request.</summary>
-		///<param name="data">The datagram data.</summary>
+		///<param name="data">The datagram data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::resendAudio(char* data, int dataSize) {
 
 		}
 
-		///<summary>Updates the client information table for the client that sent the check in.</summary>
+		///<summary>Responds to a volume data resend request.</summary>
 		///<param name="data">The datagram data.</summary>
+		///<param name="dataSize">The number of bytes in the datagram.</param>
+		void PlaybackServer::resendVolume(char* data, int dataSize){
+
+		}
+
+		///<summary>Updates the client information table for the client that sent the check in.</summary>
+		///<param name="data">The datagram data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::receiveClientCheckIn(char* data, int dataSize) {
 
@@ -39,8 +46,8 @@ namespace Networking {
 
 		///<summary>Spawns a new thread to process audio and positional data. The thread will 
 		/// automatically terminate itself when finished.</summary>
-		///<param name="audioFilename">The name of the audio file.</summary>
-		///<param name="positionFilename">The name of the position information data file.</summary>
+		///<param name="audioFilename">The name of the audio file.</param>
+		///<param name="positionFilename">The name of the position information data file.</param>
 		void PlaybackServer::processAudioFilesOnThread(char* audioFilename, char* positionFilename) {
 
 		}
@@ -90,10 +97,77 @@ namespace Networking {
 		///<param name="datagramSize">The size of the datagram.</param>
 		void PlaybackServer::dispatchNetworkMessage(char* datagram, int datagramSize) {
 			
+			//switch on the control byte
+			switch (datagram[0]){
+			
+				//A new connection.
+			case Networking::ControlBytes::NEW_CONNECTION:
+				this->receiveClientConnection(datagram, datagramSize);
+				break;
+
+				//A client check-in.
+			case Networking::ControlBytes::PERIODIC_CHECK_IN:
+				this->receiveClientCheckIn(datagram, datagramSize);
+				break;
+
+				//A client requesting an audio resend for a dropped packet.
+			case Networking::ControlBytes::RESEND_AUDIO:
+				this->resendAudio(datagram, datagramSize);
+				break;
+
+				//A client requesting a volume resend for a dropped packet.
+			case Networking::ControlBytes::RESEND_VOLUME:
+				this->resendAudio(datagram, datagramSize);
+				break;
+
+				//A pause-playback acknowledgement.
+			case Networking::ControlBytes::PAUSE_PLAYBACK:
+
+				break;
+
+				//A resume-playback acknowledgement.
+			case Networking::ControlBytes::RESUME_PLAYBACK:
+
+				break;
+
+				//A stop-playback acknowledgement.
+			case Networking::ControlBytes::STOP_PLAYBACK:
+
+				break;
+
+			}
+
 		}
 		
 		///<summary>Handles network communications and hands off incoming packets to dispatchNetworkMessage().</summary>
 		void PlaybackServer::serverReceive(){
+
+			//Receive data buffer
+			char datagram[1500];
+
+			while (this->state != PlaybackServerStates::PlaybackServer_STOPPED){
+
+				//Try to receive data for 100ms
+				int grams = this->socket->TryReceiveMessage(datagram, 1500, 100);
+
+				//Check the state of the server
+				if (this->state == PlaybackServerStates::PlaybackServer_PAUSED){
+					//If the server has been paused, wait to be signaled to start again.
+					WaitForSingleObject(this->pausedStateSem, INFINITE);
+
+					//If the server has been woken up from being paused by being stopped, continue and terminate.
+					if (this->state == PlaybackServerStates::PlaybackServer_STOPPED)
+						continue;
+				}
+
+
+				//If grams == SocketError_TIMEOUT, the receive timed out. If grams == SOCKET_ERROR, there was a different error that can be retrieved with WSAGetLastError().
+				if (grams > 0){
+					//Hand off the packet
+					this->dispatchNetworkMessage(datagram, grams);
+				}
+
+			}
 
 		}
 		///<summary>Multithreaded router function that calls serverReceieve().</summary>
