@@ -9,6 +9,8 @@ namespace Networking {
 		///<param name="data">The datagram data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::receiveClientConnection(char* data, int dataSize) {
+			
+			data[dataSize] = 0;
 
 			//Acquire the client's broadcast IP and the client's locally unique ID.
 			ClientGUID clientID;
@@ -21,8 +23,8 @@ namespace Networking {
 			clientID.LocalIP = LocalIP;
 
 			//Acquire the client's position;
-			PositionInfo clientPosition = *((PositionInfo*)(data));
-			data += sizeof(PositionInfo);
+			PositionInfo clientPosition;
+			sscanf(data, "%f%f", &clientPosition.x, &clientPosition.y);
 
 			//Build the client
 			Client client;
@@ -39,6 +41,26 @@ namespace Networking {
 		///<param name="data">The datagram data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::receiveClientCheckIn(char* data, int dataSize) {
+
+			data[dataSize] = 0;
+
+			//Acquire the client's broadcast IP and the client's locally unique ID.
+			ClientGUID clientID;
+			IP_Address BroadcastIP = *((IP_Address*)(data + 1));
+			data += sizeof(IP_Address) + 1;
+			IP_Address LocalIP = *((IP_Address*)(data + 1));
+			data += sizeof(IP_Address);
+
+			clientID.BroadcastIP = BroadcastIP;
+			clientID.LocalIP = LocalIP;
+			
+			//Acquire the client's position;
+			PositionInfo clientPosition;
+			sscanf(data, "%f%f", &clientPosition.x, &clientPosition.y);
+
+			//Update the timestamp
+			Networking::ClientInformationTable[clientID].LastCheckInTime = getMicroseconds();
+
 
 		}
 
