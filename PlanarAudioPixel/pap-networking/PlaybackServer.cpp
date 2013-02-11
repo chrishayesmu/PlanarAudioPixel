@@ -70,6 +70,26 @@ namespace Networking {
 		///<param name="message">The message data.</summary>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::resendVolume(const PacketStructures::NetworkMessage* message, int dataSize){
+			
+			//Drop resend requests that appear within a timeout's worth of microseconds of each other
+			ResendRequestIterator c = this->volumeResendRequests.find(message->VolumeResendRequest.TrackID);
+			if (c != this->volumeResendRequests.end())
+			{
+				if (c->second.find(message->VolumeResendRequest.SampleID) != c->second.end() &&
+					getMicroseconds() - c->second[message->VolumeResendRequest.SampleID] < Networking::ClientReceivedPacketTimeout) 
+				{
+					return;
+				}
+			}
+
+			//Resend the volume data
+			this->sendVolumeData(message->VolumeResendRequest.TrackID, message->VolumeResendRequest.SampleID,
+									this->tracks[message->VolumeResendRequest.TrackID].volumeData[message->VolumeResendRequest.SampleID],
+									message->VolumeResendRequest.BufferRangeStartID,
+									message->VolumeResendRequest.BufferRangeEndID);
+			
+			//Mark the last time this resend request was received
+			(this->volumeResendRequests[message->VolumeResendRequest.TrackID])[message->VolumeResendRequest.SampleID] = getMicroseconds();
 
 		}
 
