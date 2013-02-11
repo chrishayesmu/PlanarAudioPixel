@@ -206,10 +206,10 @@ namespace Networking {
 		///<returns>Integer return code specifying the result of the call.</returns>
 		int PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
 						
-			//Define a struct capable of containing both the network message and the buffer data.
+			//Define a struct capable of containing both the network message and 121 clients of volume data.
 			struct {
 				PacketStructures::NetworkMessage networkHeader;
-				char data[1500-32];
+				PacketStructures::ClientVolume volumeData[121];
 			} volumeDataMessage;
 
 			volumeDataMessage.networkHeader.ControlByte = ControlBytes::SENDING_VOLUME;
@@ -218,7 +218,29 @@ namespace Networking {
 			volumeDataMessage.networkHeader.AudioSample.BufferRangeStartID = bufferRangeStartID;
 			volumeDataMessage.networkHeader.AudioSample.BufferRangeEndID = bufferRangeEndID;
 
+			//Include the number of clients contained in this volume data message.
+			volumeDataMessage.networkHeader.Extra._dataLength = volumeData.size();
 
+			//Index into volumeDataMessage.volumeData array.
+			int j = 0;
+
+			//Indicator for first/second client in current ClientVolume structure.
+			int e = 0;
+			for (VolumeInfoIterator i = volumeData.begin(); i != volumeData.end(); ++i) {
+				if (e == 0){
+					volumeDataMessage.volumeData[j].clientID_1 = i->first;
+					volumeDataMessage.volumeData[j].clientVolume_1 = i->second;
+					++e;
+				} else {
+					volumeDataMessage.volumeData[j].clientID_2 = i->first;
+					volumeDataMessage.volumeData[j].clientVolume_2 = i->second;
+					e = 0;
+					++j;
+				}
+			}
+
+			//Send the data
+			this->sendSocket->SendMessage((char*)&volumeDataMessage, sizeof(PacketStructures::NetworkMessage) + sizeof(PacketStructures::ClientVolume) * volumeData.size());
 
 			return E_FAIL;
 		}

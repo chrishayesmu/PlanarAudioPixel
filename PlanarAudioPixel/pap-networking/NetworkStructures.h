@@ -105,6 +105,7 @@ namespace Networking
 	};
 
 	// A typedef for VolumeInfo, which is a map tying a client to a volume level.
+	typedef std::map<ClientGUID, float>::iterator VolumeInfoIterator;
 	typedef std::map<ClientGUID, float> VolumeInfo;
 
 	// A typedef for an AudioBuffer object, which is a map from sample IDs and
