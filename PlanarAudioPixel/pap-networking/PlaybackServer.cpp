@@ -194,7 +194,7 @@ namespace Networking {
 		///<param name="bufferRangeStartID">The ID of the first sample in the buffering range.</param>
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
 		///<returns>Integer return code specifying the result of the call.</returns>
-		int sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
+		int PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
 
 			return E_FAIL;
 		}

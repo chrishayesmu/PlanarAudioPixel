@@ -210,8 +210,12 @@ namespace Networking
 
 			};
 
-			// If extra data exists, it starts here.
-			char data[8];
+			// If extra data exists, it starts at (data + 8). If these 8 bytes are unused by the receiving function,
+			// they are to be considered alignment padding.
+			union {
+				char   _data[8];
+				size_t _dataLength;
+			} Extra;
 
 		};
 
