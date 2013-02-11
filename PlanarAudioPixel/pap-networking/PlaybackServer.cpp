@@ -324,6 +324,8 @@ namespace Networking {
 		///<summary>Handles server management and control messages.</summary>
 		void PlaybackServer::serverMain(){
 
+			this->playbackState = PlaybackStates::Playback_STOPPED;
+
 			do {
 
 				//Wait for a control message resource
@@ -334,18 +336,52 @@ namespace Networking {
 					PlaybackServerRequest request = this->controlMessages.front();
 					this->controlMessages.pop();
 				LeaveCriticalSection(&this->controlMessagesCriticalSection);
-
+				
 				//Play-Request variables
 				std::map<ClientGUID, Client> clients;
-				void (*bufferingCallback)(float percentBuffered);
 				int bufferMax = 0;
 				int bufferCount = 0;
 				PacketStructures::NetworkMessage playMessage;
 				bool resend = true;
 				//==============
+				
+				//Buffer-Request variables
+				sampleid_t beginBufferRange = request.controlData.bufferInfo.beginBufferRange;
+				sampleid_t endBufferRange = request.controlData.bufferInfo.endBufferRange;
+				trackid_t  bufferTrackID = request.controlData.bufferInfo.trackID;
+				//==============
 
 				switch (request.controlCode){
+					
+					//Continually buffer a particular track
+				case PlaybackServerRequestCodes::PlaybackServer_BUFFER:
 
+					//Buffer the next range of samples
+					for (int i = beginBufferRange; i < endBufferRange; ++i) {
+						this->sendAudioSample(bufferTrackID, 
+												this->tracks[bufferTrackID].audioSamples[i],
+												beginBufferRange, endBufferRange);
+						this->sendVolumeData(bufferTrackID,
+												i, this->tracks[bufferTrackID].volumeData[i],
+												beginBufferRange, endBufferRange);
+					}
+					Networking::busyWait(Networking::ClientReceivedPacketTimeout);
+
+					//Repost the buffering request until all packets have been buffered.
+					if (endBufferRange == Networking::RequiredBufferedSamplesCount){
+						PlaybackServerRequestData bufferRequestData;
+						bufferRequestData.bufferInfo.trackID			= bufferTrackID;
+						bufferRequestData.bufferInfo.beginBufferRange	= endBufferRange;
+						bufferRequestData.bufferInfo.endBufferRange		= endBufferRange + Networking::ContinuousBufferCount;
+
+						if (bufferRequestData.bufferInfo.endBufferRange > tracks[bufferTrackID].audioSamples.size())
+							bufferRequestData.bufferInfo.endBufferRange = tracks[bufferTrackID].audioSamples.size() - endBufferRange;
+
+						this->queueRequest(PlaybackServerRequestCode::PlaybackServer_BUFFER, bufferRequestData);
+					}
+
+					break;
+					
 					//Play all tracks. This code path is only taken if the playback state is STOPPED. Otherwise, RESUME is taken.
 				case PlaybackServerRequestCodes::PlaybackServer_PLAY:
 
@@ -354,8 +390,6 @@ namespace Networking {
 
 					//Acquire a local copy of the list of clients
 					clients = ClientInformationTable;
-
-					bufferingCallback = request.controlData.bufferingCallback;
 					
 					//Count the number of samples to buffer
 					for (unsigned int i = 0; i < tracks.size(); ++i) {
@@ -423,6 +457,18 @@ namespace Networking {
 
 						} while (this->samplesResend.size());
 
+						if (trackBufferSize == Networking::RequiredBufferedSamplesCount){
+							PlaybackServerRequestData bufferRequestData;
+							bufferRequestData.bufferInfo.trackID			= i;
+							bufferRequestData.bufferInfo.beginBufferRange	= trackBufferSize;
+							bufferRequestData.bufferInfo.endBufferRange		= trackBufferSize + Networking::ContinuousBufferCount;
+
+							if (bufferRequestData.bufferInfo.endBufferRange > tracks[i].audioSamples.size())
+								bufferRequestData.bufferInfo.endBufferRange = tracks[i].audioSamples.size() - trackBufferSize;
+
+							this->queueRequest(PlaybackServerRequestCode::PlaybackServer_BUFFER, bufferRequestData);
+						}
+
 					}
 
 					//Buffering is complete
@@ -453,6 +499,8 @@ namespace Networking {
 								break;
 							}
 					}
+					
+					this->playbackState = PlaybackState::Playback_PLAYING;
 
 					break;
 
@@ -530,6 +578,7 @@ namespace Networking {
 			this->serverReceivingThread = NULL;
 			this->currentRequestID = 0;
 			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
+			this->playbackState = PlaybackStates::Playback_INVALID;
 			this->initialBuffering = false;
 			InitializeCriticalSection(&this->controlMessagesCriticalSection);
 			this->controlMessagesResourceCount = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);

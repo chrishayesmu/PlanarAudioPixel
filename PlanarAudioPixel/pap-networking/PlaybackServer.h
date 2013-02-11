@@ -12,6 +12,15 @@ namespace Networking {
 	};
 	typedef PlaybackServerStates PlaybackServerState;
 
+	///<summary>A set of playback states.</summary>
+	enum PlaybackStates {
+		Playback_INVALID = -1,
+		Playback_PLAYING = 1,
+		Playback_PAUSED = 2,
+		Playback_STOPPED = 3
+	};
+	typedef PlaybackStates PlaybackState;
+
 	///<summary>A set of PlaybackServer error codes for the return values of certain functions.</summary>
 	enum PlaybackServerErrorCodes {
 		PlaybackServer_OK = 0,
@@ -52,8 +61,17 @@ namespace Networking {
 				void (*callback)(int audioErrorCode, int positionErrorCode, uint64_t token);
 			} newTrackInfo;
 
-			void (*bufferingCallback)(float percentBuffered);
-			///time_t seekTo;
+			//Information used to queue a BUFFER request
+			struct {
+				trackid_t trackID;
+				sampleid_t beginBufferRange;
+				sampleid_t endBufferRange;
+			} bufferInfo;
+
+			//Information used when buffering during the initial PLAY request
+			struct {
+				void (*bufferingCallback)(float percentBuffered);
+			} initialBufferingInfo;
 		};
 
 		///<summary>Used to send control messages to the server like Pause/Stop/Restart, etc.</summary>
@@ -73,6 +91,8 @@ namespace Networking {
 		// Maintains the servers current state. Initial state is STOPPED.
 		PlaybackServerState state;
 		HANDLE serverMainThread, serverReceivingThread;
+
+		PlaybackState playbackState;
 
 		// Track buffer object
 		TrackBuffer tracks;
