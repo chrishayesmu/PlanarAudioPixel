@@ -61,7 +61,7 @@ namespace Networking {
 		CRITICAL_SECTION controlMessagesCriticalSection;
 		HANDLE controlMessagesResourceCount;
 
-		// Main receiving socket
+		// Main receiving and sending socket
 		Socket* recvSocket, * sendSocket;
 
 		// Maintains the servers current state. Initial state is STOPPED.
@@ -72,10 +72,18 @@ namespace Networking {
 		TrackBuffer tracks;
 
 		// Used to ensure delivery of the initial buffering samples
-		typedef std::map<sampleid_t,  bool>::iterator SampleID_Bool_I;
+		typedef std::map<sampleid_t,  bool>::iterator BufferingIterator;
 		std::map<sampleid_t, bool> samplesResend;
 		std::map<sampleid_t, bool> volumesResend;
 		bool initialBuffering;
+
+		// Used to ensure transport controls are processed
+		requestid_t currentRequestID;
+		typedef std::map<requestid_t, std::map<ClientGUID, bool>>::iterator AcknowledgementIterator;
+		typedef std::map<ClientGUID, bool>::iterator ClientAcknowledgementIterator;
+
+		//requestid_t -> (ClientGUID -> bool)
+		std::map<requestid_t, std::map<ClientGUID, bool>> requestsAcknowledged;
 
 		//Construction/destruction
 		PlaybackServer();
@@ -133,17 +141,15 @@ namespace Networking {
 		///<param name="sampleBuffer">The sample data.</param>
 		///<param name="bufferIDStart">The ID of the first sample in the buffer range currently being delivered.</param>
 		///<param name="bufferIDEnd">The ID of the last sample in the buffer range currently being delivered.</param>
-		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd);
+		void sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd);
 
 		///<summary>Broadcasts volume information for the client network.</summary>
 		///<param name="trackID">The ID of the track to which this bit of volume data applies.</param>
 		///<param name="sampleID">The ID of the sample to which this bit of volume data applies.</param>
 		///<param name="bufferRangeStartID">The ID of the first sample in the buffering range.</param>
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
-		///<returns>Integer return code specifying the result of the call.</returns>
-		int sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID);
-
+		void sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID);
+		
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
 		///<param name="datagram">The network message.</param>
 		///<param name="datagramSize">The size of the datagram.</param>

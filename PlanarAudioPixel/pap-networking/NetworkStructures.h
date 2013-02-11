@@ -10,6 +10,7 @@
 #include <map>
 #include "../pap-file-io/IOStructures.h"
 #include "ControlByteConstants.h"
+#include <stdint.h>
 
 namespace Networking
 {
@@ -86,8 +87,9 @@ namespace Networking
 		time_t LastCheckInTime;
 	};
 
-	typedef unsigned int trackid_t;
-	typedef unsigned int sampleid_t;
+	typedef uint32_t trackid_t;
+	typedef uint32_t sampleid_t;
+	typedef uint64_t requestid_t;
 
 	// A structure containing the information regarding an audio sample that is sent to
 	// clients to be played.
@@ -228,6 +230,20 @@ namespace Networking
 					/* [4] */ sampleid_t SampleID;
 					/* [8] explicit padding */ unsigned char _pad[8];
 				} VolumeResendRequest;
+
+				// [16] Transport controls
+				union {
+					//Server to Client - Control
+					struct {
+						/* [8] */ int64_t timeOffset;
+						/* [8] */ requestid_t requestID;
+					};
+					//Client to Server - Acknowledgement
+					struct {
+						/* [8] */ ClientGUID clientID;
+						/* [8] */ requestid_t requestID;
+					};
+				} TransportControl;
 
 			};
 

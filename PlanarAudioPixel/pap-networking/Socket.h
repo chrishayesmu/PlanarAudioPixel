@@ -6,6 +6,8 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
+#undef SendMessage
+
 namespace Networking {
 
 	// Macros for error checking

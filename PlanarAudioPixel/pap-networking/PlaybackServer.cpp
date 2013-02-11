@@ -172,7 +172,7 @@ namespace Networking {
 		///<param name="bufferRangeStartID">The ID of the first sample in the buffer range currently being delivered.</param>
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffer range currently being delivered.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID){
+		void PlaybackServer::sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID){
 
 			//Define a struct capable of containing both the network message and the buffer data.
 			struct {
@@ -195,7 +195,6 @@ namespace Networking {
 			//Send the data
 			this->sendSocket->SendMessage((char*)&audioSampleMessage, sizeof(PacketStructures::NetworkMessage) + sampleBuffer.Data.DataLength);
 
-			return E_FAIL;
 		}
 
 		///<summary>Broadcasts volume information for the client network.</summary>
@@ -204,7 +203,7 @@ namespace Networking {
 		///<param name="bufferRangeStartID">The ID of the first sample in the buffering range.</param>
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
 		///<returns>Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
+		void PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
 						
 			//Define a struct capable of containing both the network message and 121 clients of volume data.
 			struct {
@@ -242,7 +241,6 @@ namespace Networking {
 			//Send the data
 			this->sendSocket->SendMessage((char*)&volumeDataMessage, sizeof(PacketStructures::NetworkMessage) + sizeof(PacketStructures::ClientVolume) * volumeData.size());
 
-			return E_FAIL;
 		}
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
@@ -283,13 +281,16 @@ namespace Networking {
 				}
 				break;
 
-				//A pause-playback acknowledgement.
-			case Networking::ControlBytes::PAUSE_PLAYBACK:
+				//A begin-playback acknowledgement.
+			case Networking::ControlBytes::BEGIN_PLAYBACK:
+				
+				//Acknowledge that this request has been filled by this client.
+				(this->requestsAcknowledged[message->TransportControl.requestID])[message->TransportControl.clientID] = true;
 
 				break;
 
-				//A resume-playback acknowledgement.
-			case Networking::ControlBytes::RESUME_PLAYBACK:
+				//A pause-playback acknowledgement.
+			case Networking::ControlBytes::PAUSE_PLAYBACK:
 
 				break;
 
@@ -350,6 +351,8 @@ namespace Networking {
 				void (*bufferingCallback)(float percentBuffered);
 				int bufferMax = 0;
 				int bufferCount = 0;
+				PacketStructures::NetworkMessage playMessage;
+				bool resend = true;
 				//==============
 
 				switch (request.controlCode){
@@ -382,7 +385,7 @@ namespace Networking {
 						//Add each sample as "not needing to be resent"
 						this->samplesResend.clear();
 						this->volumesResend.clear();
-						for (unsigned int j = 0; j < trackBufferSize; ++j){
+						for (unsigned int j = 0; j < trackBufferSize; ++j) {
 							this->samplesResend[j] = false;
 							this->volumesResend[j] = false;
 						}
@@ -391,7 +394,7 @@ namespace Networking {
 						do {
 							//Iterate over the keys left in sampleReceivedCounts (those are the sampleid_t's of the samples that haven't successfully buffered),
 							//and attempt to buffer them.
-							for (SampleID_Bool_I j = this->samplesResend.begin(); j != this->samplesResend.end(); ++j){
+							for (BufferingIterator j = this->samplesResend.begin(); j != this->samplesResend.end(); ++j) {
 								this->sendAudioSample(i, tracks[i].audioSamples[j->first], 0, trackBufferSize);
 							}
 														
@@ -401,7 +404,7 @@ namespace Networking {
 							std::map<sampleid_t, bool> tempSampleResend;
 
 							//Add samples back that didn't make it
-							for (SampleID_Bool_I j = this->samplesResend.begin(); j != this->samplesResend.end(); ++j){
+							for (BufferingIterator j = this->samplesResend.begin(); j != this->samplesResend.end(); ++j) {
 								if (j->second)
 									tempSampleResend[j->first] = false;
 							}
@@ -413,7 +416,7 @@ namespace Networking {
 						do {
 							//Iterate over the keys left in sampleReceivedCounts (those are the sampleid_t's of the samples that haven't successfully buffered),
 							//and attempt to buffer them.
-							for (SampleID_Bool_I j = this->volumesResend.begin(); j != this->volumesResend.end(); ++j){
+							for (BufferingIterator j = this->volumesResend.begin(); j != this->volumesResend.end(); ++j) {
 								this->sendVolumeData(i, j->first, tracks[i].volumeData[j->first], 0, trackBufferSize);
 							}
 							
@@ -423,7 +426,7 @@ namespace Networking {
 							std::map<sampleid_t, bool> tempVolumeResend;
 
 							//Add samples back that didn't make it
-							for (SampleID_Bool_I j = this->volumesResend.begin(); j != this->volumesResend.end(); ++j){
+							for (BufferingIterator j = this->volumesResend.begin(); j != this->volumesResend.end(); ++j) {
 								if (j->second)
 									tempVolumeResend[j->first] = false;
 							}
@@ -436,7 +439,31 @@ namespace Networking {
 					//Buffering is complete
 					this->initialBuffering = false;
 
-					//Send PLAY control packets
+					//Send PLAY control packets and ensure that every client has begun playback
+					++this->currentRequestID;
+
+					playMessage.ControlByte = ControlBytes::BEGIN_PLAYBACK;
+					playMessage.TransportControl.requestID = this->currentRequestID;
+
+					//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
+					//approximately two chances to have their play controls dropped.
+					playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
+					
+					for (int i = 0; i < 3 && resend; ++i){
+
+						this->sendSocket->SendMessage((char*)&playMessage, sizeof(playMessage));
+
+						//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
+						Networking::busyWait(Networking::ClientReceivedPacketTimeout);
+
+						resend = false;
+						//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
+						for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
+							if (j->second) {
+								resend = true;
+								break;
+							}
+					}
 
 					break;
 
@@ -508,6 +535,7 @@ namespace Networking {
 			this->sendSocket = NULL;
 			this->serverMainThread = NULL;
 			this->serverReceivingThread = NULL;
+			this->currentRequestID = 0;
 			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
 			this->initialBuffering = false;
 			InitializeCriticalSection(&this->controlMessagesCriticalSection);

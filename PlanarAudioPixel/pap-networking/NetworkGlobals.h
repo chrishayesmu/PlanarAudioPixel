@@ -25,7 +25,7 @@ namespace Networking
 	// The number of sample to buffer while playing
 	extern unsigned int ContinuousBufferCount;
 
-	// The number of microseconds to wait for a resend request before assuming that a client has received a packet during initial buffering
+	// The number of microseconds to wait for a resend request before assuming that a client has or hasn't received a packet
 	extern time_t ClientReceivedPacketTimeout;
 
 	// Gets the current system time as a count of microseconds.

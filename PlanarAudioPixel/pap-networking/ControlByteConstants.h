@@ -44,9 +44,11 @@ namespace Networking
 		// and when a client sends an acknowledgement to the server that playback has paused.
 		const unsigned char PAUSE_PLAYBACK = 0x09;
 
-		// Packet identifier that is sent when the server tells clients to resume playback, 
-		// and when a client sends an acknowledgement to the server that playback has resumed.
-		const unsigned char RESUME_PLAYBACK = 0x0a;
+		// Packet identifier that is sent when the server tells clients to begin playback, 
+		// and when a client sends an acknowledgement to the server that playback has begun.
+		// This control applies both to resuming from a paused state, and initiating playback
+		// from a stopped state.
+		const unsigned char BEGIN_PLAYBACK = 0x0a;
 
 		// Packet identifier that is sent when the server tells clients to stop playback, 
 		// and when a client sends an acknowledgement to the server that playback has stopped.
