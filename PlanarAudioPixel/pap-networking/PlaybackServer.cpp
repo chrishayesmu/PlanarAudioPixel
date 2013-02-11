@@ -310,21 +310,13 @@ namespace Networking {
 				}
 				break;
 
-				//A begin-playback acknowledgement.
+				//Transport control acknowledgements
 			case Networking::ControlBytes::BEGIN_PLAYBACK:
+			case Networking::ControlBytes::STOP_PLAYBACK:
+			case Networking::ControlBytes::PAUSE_PLAYBACK:
 				
 				//Acknowledge that this request has been filled by this client.
 				(this->requestsAcknowledged[message->TransportControl.requestID])[message->TransportControl.clientID] = true;
-
-				break;
-
-				//A pause-playback acknowledgement.
-			case Networking::ControlBytes::PAUSE_PLAYBACK:
-
-				break;
-
-				//A stop-playback acknowledgement.
-			case Networking::ControlBytes::STOP_PLAYBACK:
 
 				break;
 
@@ -389,6 +381,10 @@ namespace Networking {
 				sampleid_t beginBufferRange = request.controlData.bufferInfo.beginBufferRange;
 				sampleid_t endBufferRange = request.controlData.bufferInfo.endBufferRange;
 				trackid_t  bufferTrackID = request.controlData.bufferInfo.trackID;
+				//==============
+				
+				//Transport-Request variables
+				PacketStructures::NetworkMessage transportControlRequest;
 				//==============
 
 				switch (request.controlCode){
@@ -544,6 +540,36 @@ namespace Networking {
 
 					break;
 
+				case PlaybackServerRequestCodes::PlaybackServer_PAUSE:
+
+					//Send PAUSE control packets and ensure that every client has paused playback
+					++this->currentRequestID;
+
+					transportControlRequest.ControlByte = ControlBytes::PAUSE_PLAYBACK;
+					transportControlRequest.TransportControl.requestID = this->currentRequestID;
+
+					//Indicate that the clients should pause immediately when they receive the message
+					transportControlRequest.TransportControl.timeOffset = getMicroseconds();
+					
+					do {
+
+						this->sendSocket->SendMessage((char*)&transportControlRequest, sizeof(transportControlRequest));
+
+						//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
+						Networking::busyWait(Networking::ClientReceivedPacketTimeout);
+
+						resend = false;
+						//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
+						for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
+							if (j->second) {
+								resend = true;
+								break;
+							}
+
+					} while (resend);
+
+					break;
+
 					//Load a new track
 				case PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK:
 					
@@ -564,6 +590,7 @@ namespace Networking {
 						request.controlData.newTrackInfo.callback(audioCode, positionCode, request.controlData.newTrackInfo.token);
 
 					break;
+
 
 				}
 
