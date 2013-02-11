@@ -174,6 +174,7 @@ namespace Networking {
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
 		int PlaybackServer::sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID){
 
+			//Define a struct capable of containing both the network message and the buffer data.
 			struct {
 				PacketStructures::NetworkMessage networkHeader;
 				char data[1500-32];
@@ -185,6 +186,15 @@ namespace Networking {
 			audioSampleMessage.networkHeader.AudioSample.BufferRangeStartID = bufferRangeStartID;
 			audioSampleMessage.networkHeader.AudioSample.BufferRangeEndID = bufferRangeEndID;
 
+			//Assume that the function constructing the sample buffer behaved well and didn't produce a sample with greater than 1468 bytes.
+			memcpy(audioSampleMessage.data, sampleBuffer.Data.Data, sampleBuffer.Data.DataLength);
+
+			//Include the length of the data in this message.
+			audioSampleMessage.networkHeader.Extra._dataLength = sampleBuffer.Data.DataLength;
+
+			//Send the data
+			this->sendSocket->SendMessage((char*)&audioSampleMessage, sizeof(PacketStructures::NetworkMessage) + sampleBuffer.Data.DataLength);
+
 			return E_FAIL;
 		}
 
@@ -195,6 +205,20 @@ namespace Networking {
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
 		///<returns>Integer return code specifying the result of the call.</returns>
 		int PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
+						
+			//Define a struct capable of containing both the network message and the buffer data.
+			struct {
+				PacketStructures::NetworkMessage networkHeader;
+				char data[1500-32];
+			} volumeDataMessage;
+
+			volumeDataMessage.networkHeader.ControlByte = ControlBytes::SENDING_VOLUME;
+			volumeDataMessage.networkHeader.AudioSample.SampleID = sampleID;
+			volumeDataMessage.networkHeader.AudioSample.TrackID = trackID;
+			volumeDataMessage.networkHeader.AudioSample.BufferRangeStartID = bufferRangeStartID;
+			volumeDataMessage.networkHeader.AudioSample.BufferRangeEndID = bufferRangeEndID;
+
+
 
 			return E_FAIL;
 		}

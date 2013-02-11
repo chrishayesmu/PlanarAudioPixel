@@ -152,6 +152,26 @@ namespace Networking
 	
 	namespace PacketStructures {
 
+		// [24] A struct for specifying the volume of two clients for a volume data message.
+		//		Two clients are packed into this struct to align on an 8-byte boundary and
+		//		save 4 bytes per client while still maintaining a simple programming paradigm.
+	/*
+	2>  class ClientVolume	size(24):
+	2>  	+---
+	2>   0	| ClientGUID clientID_1
+	2>   8	| float		 clientVolume_1
+	2>  12	| float		 clientVolume_2
+	2>  16	| ClientGUID clientID_2
+	2>  	+---
+	*/
+		struct ClientVolume 
+		{
+			/* [8] */ ClientGUID clientID_1;
+			/* [4] */ float  clientVolume_1;
+			/* [4] */ float  clientVolume_2;
+			/* [8] */ ClientGUID clientID_2;
+		};
+
 		// [32] Represents a network packet.
 		struct NetworkMessage {
 			

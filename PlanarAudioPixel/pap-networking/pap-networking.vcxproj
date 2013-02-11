@@ -45,7 +45,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalOptions>/d1reportSingleClassLayoutNetworkMessage %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/d1reportSingleClassLayoutClientVolume %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
