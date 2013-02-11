@@ -212,7 +212,8 @@ namespace Networking
 					// The ID of the track and the ID of the sample that is to be resent
 					/* [4] */ trackid_t TrackID;
 					/* [4] */ sampleid_t SampleID;
-					/* [8] explicit padding */ unsigned char _pad[8];
+					/* [4] */ sampleid_t BufferRangeStartID;
+					/* [4] */ sampleid_t BufferRangeEndID;
 				} AudioResendRequest;
 				
 				// [16] Server to Clients - Volume sample header
@@ -228,7 +229,8 @@ namespace Networking
 					// The ID of the track and the ID of the sample that is to be resent
 					/* [4] */ trackid_t TrackID;
 					/* [4] */ sampleid_t SampleID;
-					/* [8] explicit padding */ unsigned char _pad[8];
+					/* [4] */ sampleid_t BufferRangeStartID;
+					/* [4] */ sampleid_t BufferRangeEndID;
 				} VolumeResendRequest;
 
 				// [16] Transport controls

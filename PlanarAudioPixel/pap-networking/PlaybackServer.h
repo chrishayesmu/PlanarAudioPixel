@@ -107,9 +107,14 @@ namespace Networking {
 		requestid_t currentRequestID;
 		typedef std::map<requestid_t, std::map<ClientGUID, bool>>::iterator AcknowledgementIterator;
 		typedef std::map<ClientGUID, bool>::iterator ClientAcknowledgementIterator;
-
+		
 		//requestid_t -> (ClientGUID -> bool)
 		std::map<requestid_t, std::map<ClientGUID, bool>> requestsAcknowledged;
+
+		// Maintains a list of resend requests so that the network doesn't get spammed with resending the same sample
+		typedef std::map<trackid_t, std::map<sampleid_t, time_t>>::iterator ResendRequestIterator;
+		std::map<trackid_t, std::map<sampleid_t, time_t>> sampleResendRequests;
+		std::map<trackid_t, std::map<sampleid_t, time_t>> volumeResendRequests;
 
 		//Construction/destruction
 		PlaybackServer();

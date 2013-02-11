@@ -44,6 +44,26 @@ namespace Networking {
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::resendAudio(const PacketStructures::NetworkMessage* message, int dataSize) {
 
+			//Drop resend requests that appear within a timeout's worth of microseconds of each other
+			ResendRequestIterator c = this->sampleResendRequests.find(message->AudioResendRequest.TrackID);
+			if (c != this->sampleResendRequests.end())
+			{
+				if (c->second.find(message->AudioResendRequest.SampleID) != c->second.end() &&
+					getMicroseconds() - c->second[message->AudioResendRequest.SampleID] < Networking::ClientReceivedPacketTimeout) 
+				{
+					return;
+				}
+			}
+
+			//Resend the sample
+			this->sendAudioSample(message->AudioResendRequest.TrackID,
+									this->tracks[message->AudioResendRequest.TrackID].audioSamples[message->AudioResendRequest.SampleID],
+									message->AudioResendRequest.BufferRangeStartID,
+									message->AudioResendRequest.BufferRangeEndID);
+			
+			//Mark the last time this resend request was received
+			(this->sampleResendRequests[message->AudioResendRequest.TrackID])[message->AudioResendRequest.SampleID] = getMicroseconds();
+
 		}
 
 		///<summary>Responds to a volume data resend request.</summary>
