@@ -57,18 +57,7 @@ namespace Networking {
 		void PlaybackServer::clientPositionsChanged() {
 
 		}
-		
-		///<summary>Adds the file names to a new track server request to be handled by serverMain().</summary>
-		///<param name="audioFilename">The name of the audio file.</param>
-		///<param name="positionFilename">The name of the position information data file.</param>
-		void PlaybackServer::processAudioFiles(char* audioFilename, char* positionFilename) {
-			PlaybackServerRequestData data;
-			strcpy(data.newTrackInfo.audioFilename, audioFilename);
-			strcpy(data.newTrackInfo.positionFilename, positionFilename);
-			this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK, data);
-		}
-
-		
+				
 		///<summary>Reads audio data from the file and fills an AudioBuffer.</summary>
 		///<param name="filename">The name of the audio file.</param>
 		///<param name="buffer">The buffer to fill.</param>
@@ -469,18 +458,22 @@ namespace Networking {
 
 					//Load a new track
 				case PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK:
+					
 					TrackInfo newTrack;
 					newTrack.TrackID = this->tracks.size() + 1;
 					newTrack.currentPlaybackOffset = 0;
 					newTrack.samplesBuffered = 0;
 					
 					//Read the audio file
-					this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioSamples);
+					int audioCode = this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioSamples);
 					//Read the position file
-					this->readPositionDataFromFile(request.controlData.newTrackInfo.positionFilename, newTrack.positionData);
+					int positionCode = this->readPositionDataFromFile(request.controlData.newTrackInfo.positionFilename, newTrack.positionData);
 
 					//Set the length of the track
 					newTrack.trackLength = newTrack.audioSamples.size() * 100000;
+
+					if (request.controlData.newTrackInfo.callback)
+						request.controlData.newTrackInfo.callback(audioCode, positionCode, request.controlData.newTrackInfo.token);
 
 					break;
 
@@ -566,8 +559,8 @@ namespace Networking {
 		// ---------------------------------------------
 		
 		///<summary>Attempts to start the PlaybackServer.</summary>
-		///<returns>A PlaybackServer return code indicating the result of this call.</returns>
-		int PlaybackServer::Start(){
+		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode PlaybackServer::Start(){
 
 			//god I hate the stl
 			std::queue<PlaybackServerRequest> emptyMessageQueue;
@@ -575,7 +568,7 @@ namespace Networking {
 			switch(this->state){
 			case PlaybackServerStates::PlaybackServer_RUNNING:
 				//If the server is already running, do nothing.
-				return this->state;
+				return PlaybackServerErrorCodes::PlaybackServer_OK;
 				break;
 			case PlaybackServerStates::PlaybackServer_STOPPED:
 
@@ -620,7 +613,7 @@ namespace Networking {
 					CreateThread(
 						NULL, 0, &PlaybackServer::serverRouteReceive, static_cast<void*>(this), 0, NULL);
 
-				return PlaybackServerStates::PlaybackServer_RUNNING;
+				return PlaybackServerErrorCodes::PlaybackServer_OK;
 
 				break;
 			}
@@ -631,7 +624,7 @@ namespace Networking {
 		
 		///<summary>Attempts to start playback.</summary>
 		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
-		int PlaybackServer::Play(){
+		PlaybackServerErrorCode PlaybackServer::Play(){
 			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
 				return PlaybackServerErrorCodes::PlaybackServer_INVALID;
 
@@ -677,5 +670,34 @@ namespace Networking {
 
 			*fillServer = server;
 			return Networking::SocketErrorCode::SocketError_OK;
+		}
+
+		///<summary>Attemps to add a track to the server's playlist.</summary>
+		///<param name="audioFilename">The name of the audio file to add.</param>
+		///<param name="positionFilename">The name of the corresponding position data file.</param>
+		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode PlaybackServer::AddTrack(char* audioFilename, char* positionFilename){
+			return this->AddTrack(audioFilename, positionFilename, NULL, 0);
+		}
+
+		///<summary>Queues up a request to asynchronously add a track to the server's playlist.</summary>
+		///<param name="audioFilename">The name of the audio file to add.</param>
+		///<param name="positionFilename">The name of the corresponding position data file.</param>
+		///<param name="callback">The callback function to call when the corresponding request completes.</param>
+		///<param name="token">An identifying token that is passed along with the callback when the corresponding request complete.</param>
+		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode PlaybackServer::AddTrack(char* audioFilename, char* positionFilename, void (*callback)(int audioCode, int positionCode, uint64_t token), uint64_t token){
+			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
+				return PlaybackServerErrorCodes::PlaybackServer_INVALID;
+
+			//Queue up a track.
+			PlaybackServerRequestData data;
+			strcpy(data.newTrackInfo.audioFilename, audioFilename);
+			strcpy(data.newTrackInfo.positionFilename, positionFilename);
+			data.newTrackInfo.callback = callback;
+			data.newTrackInfo.token = token;
+			this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK, data);
+
+			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}
 }

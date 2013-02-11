@@ -41,11 +41,17 @@ namespace Networking {
 
 		///<summary>Used to service particular control messages.</summary>
 		union PlaybackServerRequestData {
+
+			//Information used to queue a NEW_TRACK request
 			struct {
 				char audioFilename[256];
 				char positionFilename[256];
-				void (*callback)(int audioErrorCode, int positionErrorCode);
+
+				//Callback information
+				uint64_t token;
+				void (*callback)(int audioErrorCode, int positionErrorCode, uint64_t token);
 			} newTrackInfo;
+
 			void (*bufferingCallback)(float percentBuffered);
 			///time_t seekTo;
 		};
@@ -117,11 +123,6 @@ namespace Networking {
 		/// clients have moved, join, or dropped out, and that the volume must therefore be recalculated.</summary>
 		void clientPositionsChanged();
 
-		///<summary>Adds the file names to a new track server request to be handled by serverMain().</summary>
-		///<param name="audioFilename">The name of the audio file.</summary>
-		///<param name="positionFilename">The name of the position information data file.</summary>
-		void processAudioFiles(char* audioFilename, char* positionFilename);
-
 		///<summary>Reads audio data from the file and fills an AudioBuffer.</summary>
 		///<param name="filename">The name of the audio file.</param>
 		///<param name="buffer">The buffer to fill.</param>
@@ -182,12 +183,26 @@ namespace Networking {
 		static int Create(PlaybackServer** fillServer);
 		
 		///<summary>Attempts to start the PlaybackServer.</summary>
-		///<returns>A PlaybackServerState code indicating the state of this call. If the state is not RUNNING, an error code is returned.</returns>
-		int Start();
+		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode Start();
 
 		///<summary>Attempts to start playback.</summary>
 		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
-		int Play();
+		PlaybackServerErrorCode Play();
+		
+		///<summary>Queues up a request to asynchronously add a track to the server's playlist.</summary>
+		///<param name="audioFilename">The name of the audio file to add.</param>
+		///<param name="positionFilename">The name of the corresponding position data file.</param>
+		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode AddTrack(char* audioFilename, char* positionFilename);
+		
+		///<summary>Queues up a request to asynchronously add a track to the server's playlist.</summary>
+		///<param name="audioFilename">The name of the audio file to add.</param>
+		///<param name="positionFilename">The name of the corresponding position data file.</param>
+		///<param name="callback">The callback function to call when the corresponding request completes.</param>
+		///<param name="token">An identifying token that is passed along with the callback when the corresponding request complete.</param>
+		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode AddTrack(char* audioFilename, char* positionFilename, void (*callback)(int audioCode, int positionCode, uint64_t token), uint64_t token);
 
 	};
 
