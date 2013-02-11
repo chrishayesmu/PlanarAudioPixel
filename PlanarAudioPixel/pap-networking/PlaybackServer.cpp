@@ -167,22 +167,34 @@ namespace Networking {
 		}
 
 		///<summary>Broadcasts an audio sample to the client network.</summary>
+		///<param name="trackID">The ID of the track that this AudioSample belongs to.</param>
 		///<param name="sampleBuffer">The sample data.</param>
-		///<param name="bufferIDStart">The ID of the first sample in the buffer range currently being delivered.</param>
-		///<param name="bufferIDEnd">The ID of the last sample in the buffer range currently being delivered.</param>
+		///<param name="bufferRangeStartID">The ID of the first sample in the buffer range currently being delivered.</param>
+		///<param name="bufferRangeEndID">The ID of the last sample in the buffer range currently being delivered.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::sendAudioSample(AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd){
+		int PlaybackServer::sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID){
+
+			struct {
+				PacketStructures::NetworkMessage networkHeader;
+				char data[1500-32];
+			} audioSampleMessage;
+
+			audioSampleMessage.networkHeader.ControlByte = ControlBytes::SENDING_AUDIO;
+			audioSampleMessage.networkHeader.AudioSample.SampleID = sampleBuffer.SampleID;
+			audioSampleMessage.networkHeader.AudioSample.TrackID = trackID;
+			audioSampleMessage.networkHeader.AudioSample.BufferRangeStartID = bufferRangeStartID;
+			audioSampleMessage.networkHeader.AudioSample.BufferRangeEndID = bufferRangeEndID;
 
 			return E_FAIL;
 		}
 
 		///<summary>Broadcasts volume information for the client network.</summary>
-		///<param name="segmentID">The ID of the segment to which this bit of volume data applies.</param>
 		///<param name="trackID">The ID of the track to which this bit of volume data applies.</param>
-		///<param name="volumeDataBuffer">The raw data containing the volume information.</param>
-		///<param name="bufferSize">The number of bytes volume data.</param>
+		///<param name="sampleID">The ID of the sample to which this bit of volume data applies.</param>
+		///<param name="bufferRangeStartID">The ID of the first sample in the buffering range.</param>
+		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
 		///<returns>Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::sendVolumeData(sampleid_t segmentID, trackid_t trackID, char* volumeDataBuffer, int bufferSize) {
+		int sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
 
 			return E_FAIL;
 		}
@@ -209,15 +221,20 @@ namespace Networking {
 			case Networking::ControlBytes::RESEND_AUDIO:
 				if (!this->initialBuffering)
 					this->resendAudio(message, datagramSize);
-				else {
-
-					
+				else { 
+					//If we're in the initial buffering phase, check off that a sample didn't make it: "needs to be resent"
+					this->samplesResend[message->AudioResendRequest.SampleID] = true;
 				}
 				break;
 
 				//A client requesting a volume resend for a dropped packet.
 			case Networking::ControlBytes::RESEND_VOLUME:
-				this->resendAudio(message, datagramSize);
+				if (!this->initialBuffering)
+					this->resendVolume(message, datagramSize);
+				else { 
+					//If we're in the initial buffering phase, check off that a sample didn't make it: "needs to be resent"
+					this->samplesResend[message->VolumeResendRequest.SampleID] = true;
+				}
 				break;
 
 				//A pause-playback acknowledgement.
@@ -303,43 +320,77 @@ namespace Networking {
 					bufferingCallback = request.controlData.bufferingCallback;
 					
 					//Count the number of samples to buffer
-					for (unsigned int i = 0; i < tracks.size(); ++i){
+					for (unsigned int i = 0; i < tracks.size(); ++i) {
 						bufferMax += min(tracks[i].audioSamples.size(), RequiredBufferedSamplesCount) * 2;
 					}
 
 					//Send the first RequiredBufferedSamplesCount samples and accompanying volume information
 					//and ensure that they arrive.
-					for (unsigned int i = 0; i < tracks.size(); ++i) {
+					for (unsigned int i = 0; i < tracks.size(); ++i) 
+					{
 
+						//If there are less samples in the track than the required initial buffering amount, buffer the entire
+						//track.
 						unsigned int trackBufferSize = min(tracks[i].audioSamples.size(), RequiredBufferedSamplesCount);
 
-						this->sampleReceivedCounts.clear();
-						this->volumeReceivedCounts.clear();
-
+						//Add each sample as "not needing to be resent"
+						this->samplesResend.clear();
+						this->volumesResend.clear();
 						for (unsigned int j = 0; j < trackBufferSize; ++j){
-							this->sampleReceivedCounts[j] = 0;
-							this->volumeReceivedCounts[j] = 0;
+							this->samplesResend[j] = false;
+							this->volumesResend[j] = false;
 						}
 
-						bool samplesBuffered = false;
+						//Send samples
 						do {
 							//Iterate over the keys left in sampleReceivedCounts (those are the sampleid_t's of the samples that haven't successfully buffered),
 							//and attempt to buffer them.
-							for (SampleID_UInt_I j = this->sampleReceivedCounts.begin(); j != this->sampleReceivedCounts.end(); ++j){
-								this->sendAudioSample(tracks[i].audioSamples[j->first], 0, trackBufferSize);
+							for (SampleID_Bool_I j = this->samplesResend.begin(); j != this->samplesResend.end(); ++j){
+								this->sendAudioSample(i, tracks[i].audioSamples[j->first], 0, trackBufferSize);
 							}
+														
+							//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
+							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
-							samplesBuffered = true;
+							std::map<sampleid_t, bool> tempSampleResend;
+
+							//Add samples back that didn't make it
+							for (SampleID_Bool_I j = this->samplesResend.begin(); j != this->samplesResend.end(); ++j){
+								if (j->second)
+									tempSampleResend[j->first] = false;
+							}
+							this->samplesResend = tempSampleResend;
+
+						} while (this->samplesResend.size());
+
+						//Send volume data
+						do {
+							//Iterate over the keys left in sampleReceivedCounts (those are the sampleid_t's of the samples that haven't successfully buffered),
+							//and attempt to buffer them.
+							for (SampleID_Bool_I j = this->volumesResend.begin(); j != this->volumesResend.end(); ++j){
+								this->sendVolumeData(i, j->first, tracks[i].volumeData[j->first], 0, trackBufferSize);
+							}
 							
 							//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
 							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
+							std::map<sampleid_t, bool> tempVolumeResend;
 
-						} while (!samplesBuffered);
+							//Add samples back that didn't make it
+							for (SampleID_Bool_I j = this->volumesResend.begin(); j != this->volumesResend.end(); ++j){
+								if (j->second)
+									tempVolumeResend[j->first] = false;
+							}
+							this->samplesResend = tempVolumeResend;
+
+						} while (this->samplesResend.size());
 
 					}
 
+					//Buffering is complete
 					this->initialBuffering = false;
+
+					//Send PLAY control packets
 
 					break;
 

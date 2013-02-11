@@ -15,7 +15,7 @@ namespace Networking
 
 	unsigned int ContinuousBufferCount = 10;
 
-	time_t ClientReceivedPacketTimeout = 20000;
+	time_t ClientReceivedPacketTimeout = 200000;
 
 	time_t getMicroseconds(){
 		FILETIME time;

@@ -72,9 +72,9 @@ namespace Networking {
 		TrackBuffer tracks;
 
 		// Used to ensure delivery of the initial buffering samples
-		typedef std::map<sampleid_t, unsigned int>::iterator SampleID_UInt_I;
-		std::map<sampleid_t, unsigned int> sampleReceivedCounts;
-		std::map<sampleid_t, unsigned int> volumeReceivedCounts;
+		typedef std::map<sampleid_t,  bool>::iterator SampleID_Bool_I;
+		std::map<sampleid_t, bool> samplesResend;
+		std::map<sampleid_t, bool> volumesResend;
 		bool initialBuffering;
 
 		//Construction/destruction
@@ -129,19 +129,20 @@ namespace Networking {
 		//## Possibly add an RTT field to the Client structure and periodically send RTT tracking requests. Then use it 
 		//## to send an accurate expected wait time to a Client for receiving all samples in a buffer range.
 		///<summary>Broadcasts an audio sample to the client network.</summary>
+		///<param name="trackID">The ID of the track that this AudioSample belongs to.</param>
 		///<param name="sampleBuffer">The sample data.</param>
 		///<param name="bufferIDStart">The ID of the first sample in the buffer range currently being delivered.</param>
 		///<param name="bufferIDEnd">The ID of the last sample in the buffer range currently being delivered.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int sendAudioSample(AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd);
+		int sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferIDStart, sampleid_t bufferIDEnd);
 
 		///<summary>Broadcasts volume information for the client network.</summary>
-		///<param name="sampleID">The ID of the sample to which this bit of volume data applies.</param>
 		///<param name="trackID">The ID of the track to which this bit of volume data applies.</param>
-		///<param name="volumeDataBuffer">The raw data containing the volume information.</param>
-		///<param name="bufferSize">The number of bytes of volume data.</param>
+		///<param name="sampleID">The ID of the sample to which this bit of volume data applies.</param>
+		///<param name="bufferRangeStartID">The ID of the first sample in the buffering range.</param>
+		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
 		///<returns>Integer return code specifying the result of the call.</returns>
-		int sendVolumeData(sampleid_t sampleID, trackid_t trackID, char* volumeDataBuffer, int bufferSize);
+		int sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID);
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
 		///<param name="datagram">The network message.</param>

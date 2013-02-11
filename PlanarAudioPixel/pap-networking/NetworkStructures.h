@@ -93,6 +93,7 @@ namespace Networking
 	// clients to be played.
 	struct AudioSample 
 	{
+
 		// The ID of the sample.
 		sampleid_t SampleID;
 
@@ -103,30 +104,16 @@ namespace Networking
 		IO::AudioData Data;
 	};
 
-	// A structure containing volume information regarding an audio sample for a particular
-	// client.
-	struct VolumeInfo 
-	{
-		// The ID of the track to which this information applies.
-		trackid_t TrackID;
+	// A typedef for VolumeInfo, which is a map tying a client to a volume level.
+	typedef std::map<ClientGUID, float> VolumeInfo;
 
-		// The ID of the sample to which this information applies.
-		sampleid_t SampleID;
-
-		// The GUID of the client to which this information applies.
-		ClientGUID ClientID;
-
-		// The volume for this sample to be played at, between 0 and 1.
-		float Volume;
-	};
-
-	// A typedef for an AudioBuffer object, which is a map between sample IDs and
+	// A typedef for an AudioBuffer object, which is a map from sample IDs and
 	// audio objects.
 	typedef std::map<sampleid_t, AudioSample> AudioBuffer;
 
-	// A typedef for an VolumeBuffer object, which is a map between sample IDs and
-	// maps between ClientGUIDs and VolumeInfo objects.
-	typedef std::map<sampleid_t, std::map<ClientGUID, VolumeInfo>> VolumeBuffer;
+	// A typedef for an VolumeBuffer object, which is a map from sample IDs to
+	// VolumeInfo objects, which themselves map ClientGUIDs to actual volume levels.
+	typedef std::map<sampleid_t, VolumeInfo> VolumeBuffer;
 
 	// A typedef for a PositionBuffer object, which is a map from sample IDs to
 	// PositionInfo objects
@@ -193,7 +180,8 @@ namespace Networking
 				struct {
 					/* [4] */ trackid_t TrackID;
 					/* [4] */ sampleid_t SampleID;
-					/* [8] explicit padding */ unsigned char _pad[8];
+					/* [4] */ sampleid_t BufferRangeStartID;
+					/* [4] */ sampleid_t BufferRangeEndID;
 				} AudioSample;
 				
 				// [16] Client to Server - Audio sample resend request
@@ -208,7 +196,8 @@ namespace Networking
 				struct {
 					/* [4] */ trackid_t TrackID;
 					/* [4] */ sampleid_t SampleID;
-					/* [8] explicit padding */ unsigned char _pad[8];
+					/* [4] */ sampleid_t BufferRangeStartID;
+					/* [4] */ sampleid_t BufferRangeEndID;
 				} VolumeSample;
 				
 				// [16] Client to Server - Audio sample resend request
