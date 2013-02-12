@@ -32,7 +32,7 @@ namespace PlaybackServerTest
 
             try
             {
-                playbackServer.Start();
+                playbackServer.ServerStart();
                 MessageBox.Show("Server started successfully!");
             }
             catch (Exception ex)

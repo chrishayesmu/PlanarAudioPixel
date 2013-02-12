@@ -224,11 +224,19 @@ namespace Networking {
 		
 		///<summary>Attempts to start the PlaybackServer.</summary>
 		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
-		PlaybackServerErrorCode Start();
+		PlaybackServerErrorCode ServerStart();
 
 		///<summary>Attempts to start playback.</summary>
 		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
 		PlaybackServerErrorCode Play();
+
+		///<summary>Attempts to pause playback.</summary>
+		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode Pause();
+
+		///<summary>Attempts to stop playback.</summary>
+		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode Stop();
 		
 		///<summary>Queues up a request to asynchronously add a track to the server's playlist.</summary>
 		///<param name="audioFilename">The name of the audio file to add.</param>

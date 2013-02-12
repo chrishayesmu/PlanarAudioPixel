@@ -128,8 +128,11 @@ namespace Networking
 		// The ID of the track.
 		trackid_t TrackID;
 
-		// Where this track is in its playback, in microseconds.
-		time_t currentPlaybackOffset;
+		// The time, in microseconds, when this track BEGAN playback.
+		time_t playbackOriginOffset;
+
+		// The time, in microseconds, left in this track.
+		time_t playbackRemainingTime;
 
 		// The length, in microseconds, of this track.
 		time_t trackLength;

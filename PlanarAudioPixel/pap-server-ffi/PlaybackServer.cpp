@@ -26,8 +26,8 @@ namespace PlanarAudioPixel {
 	
 	///<summary>Attempts to start the PlaybackServer.</summary>
 	///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
-	void PlaybackServer::Start(){
-		Networking::PlaybackServerErrorCode result = this->server->Start();
+	void PlaybackServer::ServerStart(){
+		Networking::PlaybackServerErrorCode result = this->server->ServerStart();
 		if (result != Networking::PlaybackServerErrorCodes::PlaybackServer_OK) {
 			throw gcnew Exception(L"Could not start the playback server.");
 		}

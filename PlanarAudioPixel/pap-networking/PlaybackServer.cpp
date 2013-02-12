@@ -355,11 +355,9 @@ namespace Networking {
 		
 		///<summary>Handles server management and control messages.</summary>
 		void PlaybackServer::serverMain(){
-
 			this->playbackState = PlaybackStates::Playback_STOPPED;
 
 			do {
-
 				//Wait for a control message resource
 				WaitForSingleObject(this->controlMessagesResourceCount, INFINITE);
 
@@ -388,9 +386,37 @@ namespace Networking {
 				//==============
 
 				switch (request.controlCode){
-					
+
+					//Process timer tick events
+				case PlaybackServerRequestCodes::PlaybackServer_TIMER_TICK:
+
+					if (this->playbackState == PlaybackStates::Playback_PLAYING) {
+
+						//Check to see if all tracks have ended
+						bool ended = true;
+						for (int i = 0; i < tracks.size(); ++i){
+							if ((getMicroseconds() - tracks[i].playbackRemainingTime) < tracks[i].playbackOriginOffset) {
+								ended = false;
+								break;
+							}
+						}
+						if (ended) {
+							//Tracks have ended - Send a stop request
+							this->queueRequest(PlaybackServerRequestCode::PlaybackServer_STOP);
+						}
+
+					}
+
+					//Indicate that this timer tick was consumed
+					this->timerTicked = false;
+
+					break;
+
 					//Continually buffer a particular track
 				case PlaybackServerRequestCodes::PlaybackServer_BUFFER:
+					
+					//If we're stopped, ignore BUFFER requests
+					if (this->playbackState == PlaybackStates::Playback_STOPPED) break;
 
 					//Buffer the next range of samples
 					for (unsigned int i = beginBufferRange; i < endBufferRange; ++i) {
@@ -420,6 +446,7 @@ namespace Networking {
 					
 				case PlaybackServerRequestCodes::PlaybackServer_PLAY:
 					//If the current state is STOPPED, we have to do initial buffer, otherwise, we just send PLAY packets.
+					//Otherwise otherwise, we just ignore it.
 					if (this->playbackState == PlaybackStates::Playback_STOPPED) {
 						//Indicate that this is the initial buffering phase
 						this->initialBuffering = true;
@@ -436,6 +463,8 @@ namespace Networking {
 						//and ensure that they arrive.
 						for (unsigned int i = 0; i < tracks.size(); ++i) 
 						{
+							//Playing from the beginning of the track implies that the remaining amount of time on a track is the entire length of that track
+							tracks[i].playbackRemainingTime = tracks[i].trackLength;
 
 							//If there are less samples in the track than the required initial buffering amount, buffer the entire
 							//track.
@@ -525,6 +554,11 @@ namespace Networking {
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
 						playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
+
+						//Mark when each track began playback
+						for (int i = 0; i < tracks.size(); ++i) {
+							tracks[i].playbackOriginOffset = playMessage.TransportControl.timeOffset;
+						}
 					
 						for (int i = 0; i < 3 && resend; ++i){
 
@@ -561,6 +595,11 @@ namespace Networking {
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
 						playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
+
+						//Update when each track began playback again
+						for (int i = 0; i < tracks.size(); ++i) {
+							tracks[i].playbackOriginOffset = playMessage.TransportControl.timeOffset;
+						}
 					
 						for (int i = 0; i < 3 && resend; ++i){
 
@@ -587,6 +626,9 @@ namespace Networking {
 					//Pauses playback
 				case PlaybackServerRequestCodes::PlaybackServer_PAUSE:
 
+					//If we aren't currently playing, ignore this request.
+					if (this->playbackState != PlaybackStates::Playback_PLAYING) break;
+
 					//Send PAUSE control packets and ensure that every client has paused playback
 					++this->currentRequestID;
 
@@ -595,6 +637,11 @@ namespace Networking {
 
 					//Indicate that the clients should pause immediately when they receive the message
 					transportControlRequest.TransportControl.timeOffset = getMicroseconds();
+
+					//Update the remaining amount of time for each track
+					for (int i = 0; i < tracks.size(); ++i) {
+						tracks[i].playbackRemainingTime = tracks[i].trackLength - (transportControlRequest.TransportControl.timeOffset - tracks[i].playbackOriginOffset);
+					}
 					
 					do {
 
@@ -619,6 +666,9 @@ namespace Networking {
 
 					//Stops playback
 				case PlaybackServerRequestCodes::PlaybackServer_STOP:
+					
+					//If we aren't currently playing, ignore this request.
+					if (this->playbackState != PlaybackStates::Playback_PLAYING) break;
 
 					//Send PAUSE control packets and ensure that every client has paused playback
 					++this->currentRequestID;
@@ -655,7 +705,6 @@ namespace Networking {
 					
 					TrackInfo newTrack;
 					newTrack.TrackID = this->tracks.size() + 1;
-					newTrack.currentPlaybackOffset = 0;
 					
 					//Read the audio file
 					int audioCode = this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioSamples);
@@ -687,10 +736,10 @@ namespace Networking {
 
 			//Timer has started up.
 			EnterCriticalSection(&this->timerDestroyedCriticalSection);
-
+			
 			while (this->state != PlaybackServerStates::PlaybackServer_INVALID) {
 				//Queue up timer tick requests
-				if (!this->timerTicked) {
+				if (!this->timerTicked && this->state == PlaybackServerStates::PlaybackServer_RUNNING) {
 					this->timerTicked = true;
 					this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_TIMER_TICK);
 				}
@@ -798,7 +847,7 @@ namespace Networking {
 		
 		///<summary>Attempts to start the PlaybackServer.</summary>
 		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
-		PlaybackServerErrorCode PlaybackServer::Start(){
+		PlaybackServerErrorCode PlaybackServer::ServerStart(){
 
 			//god I hate the stl
 			std::queue<PlaybackServerRequest> emptyMessageQueue;
@@ -867,6 +916,28 @@ namespace Networking {
 				return PlaybackServerErrorCodes::PlaybackServer_ISINVALID;
 
 			this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_PLAY);
+
+			return PlaybackServerErrorCodes::PlaybackServer_OK;
+		}
+		
+		///<summary>Attempts to pause playback.</summary>
+		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode PlaybackServer::Pause() {
+			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
+				return PlaybackServerErrorCodes::PlaybackServer_ISINVALID;
+
+			this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_PAUSE);
+
+			return PlaybackServerErrorCodes::PlaybackServer_OK;
+		}
+
+		///<summary>Attempts to stop playback.</summary>
+		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+		PlaybackServerErrorCode PlaybackServer::Stop() {
+			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
+				return PlaybackServerErrorCodes::PlaybackServer_ISINVALID;
+
+			this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_STOP);
 
 			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}

@@ -38,7 +38,7 @@ namespace PlanarAudioPixel {
 		
 		///<summary>Attempts to start the PlaybackServer.</summary>
 		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
-		void Start();
+		void ServerStart();
 		
 		///<summary>Attempts to start playback.</summary>
 		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
