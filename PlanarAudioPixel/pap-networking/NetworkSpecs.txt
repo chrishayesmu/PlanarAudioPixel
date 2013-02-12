@@ -2,26 +2,40 @@
 Network Specifications
 =================================
 
-Client                   1.
-Server                   2.
+1.		Client
+2.		Server
 
 1. Client
 ----------
 
-Connecting               1.1
-Sending Check-Ins        1.2
-
-
+1.1			Connecting
+1.2			Checking In
+1.3			Receiving Data
+1.4			Receiving Audio Samples
+	1.4.1		Acquiring the Data
+	1.4.2		Interpreting the Header
+	1.4.3		Realizing Dropped Packets
+1.5			Receiving Volume Data
+	1.5.1		Acquiring the Data
+	1.5.2		Interpreting the Header
+	1.5.3		Realizing Dropped Packets
+1.6			Receiving and Responding to Transport Controls
+	1.6.1		PLAY
+	1.6.2		PAUSE
+	1.6.3		STOP
 
 
 1.1 Connecting
 --------------
 
 	To connect to the server, a client must construct and send a PacketStructures::NeworkMessage with the control byte set to ControlBytes::NEW_CONNECTION.
+	The client cannot assume that its connection has been accepted until it receives a response network message with the NEW_CONNECTION control byte. Until
+	that time, the client should continue sending connection requests every ClientReceivedPacketTimeout number of microseconds until its connection is
+	accepted. 
 
 
-1.2 Sending Check-Ins
----------------------
+1.2 Checking In
+---------------
 
 	The client must construct and send a PacketStructures::NetworkMessage with the control byte set to ControlBytes::PERIODIC_CHECK_IN and the
 	PacketStructures::NetworkMessage::ClientCheckIn filled in appropriately. It should do this WITHIN at least every CLIENT_CHECKIN_DELAY number
@@ -31,3 +45,275 @@ Sending Check-Ins        1.2
 
 	If the client is dropped, it will receive a network message with the ControlBytes::DISCONNECT control byte. If the client successfully receives
 	this message, it can send a new connection message to reconnect.
+
+
+1.3 Receiving Data
+------------------
+
+	Once the client has connected, it can expect to start receiving data. These samples will arrive in at most 1,500 byte chunks. Some may be shorter,
+	but the client should never assume the length of any message. Therefore any message coming in should be read into PacketStructures::NetworkMessage of
+	the greatest possible length:
+
+		struct {
+			//32 byte packet header
+			PacketStructures::NetworkMessage messageHeader;
+			//1468 byte data payload
+			char data[1500-32];
+		} incomingMessage;
+
+		mySocket->ReceiveMessage((char*)&incomingMessage, 1500);
+
+	The client can now act on the message by switching on the control byte in the message header.
+
+		switch (incomingMessage.messageHeader.ControlByte) 
+		{
+			...
+		}
+
+
+1.4 Receiving Audio Samples
+---------------------------
+
+	1.4.1 Acquiring the Data
+	------------------------
+
+		The client will begin to receive up to 1,500 byte audio sample packets. 
+
+		To receive an audio sample correctly, an incoming network message should be constructed as described in (1.3 Receiving Data). When the message
+		comes in, the data from the sample will be stored in the
+
+			incomingMessage.data
+
+		as described in (1.3). The length of the sample, in bytes, can be found in
+
+			incomingMessage.messageHeader.Extra._dataLength
+
+	1.4.2 Interpreting the Header
+	-----------------------------
+
+		A PacketStructures::NetworkMessage::AudioSample has the following structure:
+
+		// [16] Server to Clients - Audio sample header
+		struct {
+			/* [4] */ trackid_t TrackID;
+			/* [4] */ sampleid_t SampleID;
+			/* [4] */ sampleid_t BufferRangeStartID;
+			/* [4] */ sampleid_t BufferRangeEndID;
+		} AudioSample;
+
+		- TrackID	: The ID of the track to which this sample applies.
+		- SampleID	: The ID of the sample.
+		- BufferRangeStartID	: The ID of the first sample in this buffer range.
+		- BufferRangeEndID		: The ID of the last sample in this buffer range.
+
+		The TrackID and SampleID together form a unique key for this sample data. That is their only purpose.
+
+		The BufferRangeStartID and BufferRangeEndID are crucial in determining lost packets. Once the client
+		receives an audio sample, it should fully expect to receive every sample in that range. Determining
+		lost packets is detailed in 1.4.3 (Realizing Dropped Packets).
+
+	1.4.3 Realizing Dropped Packets
+	-------------------------------
+
+		When receiving an audio sample, the begin and end range sample ID fields can be used to ensure that
+		packets have been received.
+
+		A possible algorithmic solution is as follows:
+
+			1) A list of "expected" (TrackID, SampleID)'s should be constructed for the given range.
+				- The audio sample will have its own (TrackID, SampleID) which should not be added to the 
+				  "expected" list, since it was just received.
+				- For each new audio sample that is received, if that sample's range is already in the
+				  "expected" list, remove that sample's (TrackID, SampleID) from the list.
+
+			2) A timer event timeout should be issued for this range. When the timer times out, if any
+			   of the samples in the range have not been received, *send a resend request*.
+			    - Since every sample in this range is sent at essentially the same time, the timeout
+				  should be set to one ClientReceivedPacketTimeout number of microseconds.
+
+			3) When the timer event times out, if all the packets have been received, the range should
+			   be removed from the "expected" list. If not all the packets have been received, another
+			   timeout should be issued for that range after the *resend request* has been sent.
+
+1.5 Receiving Volume Data
+-------------------------
+
+	1.5.1 Acquiring the Data
+	------------------------
+
+		The client will begin to receive up to 1,500 byte volume data packets. 
+
+		To receive volume data correctly, an incoming network message should be constructed as described in (1.3 Receiving Data). When the message
+		comes in, the data from the sample will be stored in the
+
+			incomingMessage.data
+
+		as described in (1.3). The number of clients represented can be found in
+
+			incomingMessage.messageHeader.Extra._dataLength
+
+		Volume data is particular to a (TrackID, SampleID, Client). The network message contains the TrackID and SampleID. The client must then parse
+		the data to find its ID and corresponding volume.
+
+		The client can cast the incomingMessage.data to a PacketStructures::ClientVolume*. PacketStructures::ClientVolume structures contain TWO ClientIDs
+		with TWO corresponding volumes, therefore the client should iterate
+
+			incomingMessage.messageHeader.Extra._dataLength / 2
+
+		times, checking each ClientID at each index. If the ClientID at any index matches the client's ID, that client should accept the corresponding
+		volume as its volume value for that (TrackID, SampleID).
+
+	1.5.2 Interpreting the Header
+	-----------------------------
+
+		A PacketStructures::NetworkMessage::VolumeData has the following structure:
+
+		// [16] Server to Clients - Audio sample header
+		struct {
+			/* [4] */ trackid_t TrackID;
+			/* [4] */ sampleid_t SampleID;
+			/* [4] */ sampleid_t BufferRangeStartID;
+			/* [4] */ sampleid_t BufferRangeEndID;
+		} AudioSample;
+
+		- TrackID	: The ID of the track to which this volume data applies.
+		- SampleID	: The ID of the sample to which this volume data applies.
+		- BufferRangeStartID	: The ID of the first sample's volume data in this buffer range.
+		- BufferRangeEndID		: The ID of the last sample's volume data in this buffer range.
+
+		The TrackID and SampleID together form a partial key for this sample data. That is their only purpose.
+		The final part of the unique key is the ClientID, found the in the data part.
+
+		The BufferRangeStartID and BufferRangeEndID are crucial in determining lost packets. Once the client
+		receives volume data, it should fully expect to receive volume data for every sample in that range. Determining
+		lost packets is detailed in 1.5.3 (Realizing Dropped Packets).
+
+	1.5.3 Realizing Dropped Packets
+	-------------------------------
+
+		When receiving volume data, the begin and end range sample ID fields can be used to ensure that
+		packets have been received.
+
+		A possible algorithmic solution is as follows:
+
+			1) A list of "expected" (TrackID, SampleID)'s should be constructed for the given range.
+				- The audio sample will have its own (TrackID, SampleID) which should not be added to the 
+				  "expected" list, since it was just received.
+				- For each new audio sample that is received, if that sample's range is already in the
+				  "expected" list, remove that sample's (TrackID, SampleID) from the list.
+
+			2) A timer event timeout should be issued for this range. When the timer times out, if any
+			   of the samples in the range have not been received, *send a resend request*.
+			    - Since every sample in this range is sent at essentially the same time, the timeout
+				  should be set to one ClientReceivedPacketTimeout number of microseconds.
+
+			3) When the timer event times out, if all the packets have been received, the range should
+			   be removed from the "expected" list. If not all the packets have been received, another
+			   timeout should be issued for that range after the *resend request* has been sent.
+
+
+1.6 Receiving and Responding to Transport Controls
+--------------------------------------------------
+
+	1.6.1 PLAY
+	----------
+
+		A PLAY transport control message will not contain any extra data past the 32 byte network message header.
+
+		To receive the message correctly, an incoming network message should still be constructed as described in (1.3 Receiving Data). The control
+		byte will be set to ControlBytes::BEGIN_PLAYBACK.
+	
+		The time at which to begin (or continue, if a previous PAUSE control was sent) is stored in the message header field
+	
+			PacketStructures::NetworkMessage::TransportControl::timeOffset
+
+		The client will also receive a corresponding requestID in
+
+			PacketStructures::NetworkMessage::TransportControl::requestID
+
+		This value is *crucial and required* when responding with an acknowledgement.
+		
+		==
+	
+		As soon as the client receives the transport control message, it absolutely must immediately send an acknowledgement packet back to the server.
+
+		The acknowledgement packet should be constructed as a PacketStructures::NetworkMessage with the following fields set:
+
+			PacketStructures::NetworkMessage::TransportControl::clientID  = The ID of the client that is sending the acknowledgement
+			PacketStructures::NetworkMessage::TransportControl::requestID = The request ID. This *MUST* be the same as the request ID provided
+																			in the initial PLAY request from the server.
+
+
+	1.6.2 PAUSE
+	-----------
+
+		A PAUSE transport control message will not contain any extra data past the 32 byte network message header.
+
+		To receive the message correctly, an incoming network message should still be constructed as described in (1.3 Receiving Data). The control
+		byte will be set to ControlBytes::PAUSE_PLAYBACK.
+	
+		The time at which to process the pause message. Typically this is set to the time at which the request was created on the server, which
+		indicates to the client that it should process the request immediately.
+	
+			PacketStructures::NetworkMessage::TransportControl::timeOffset
+
+		The client will also receive a corresponding requestID in
+
+			PacketStructures::NetworkMessage::TransportControl::requestID
+
+		This value is *crucial and required* when responding with an acknowledgement.
+		
+		==
+	
+		As soon as the client receives the transport control message, it absolutely must immediately send an acknowledgement packet back to the server.
+
+		The acknowledgement packet should be constructed as a PacketStructures::NetworkMessage with the following fields set:
+
+			PacketStructures::NetworkMessage::TransportControl::clientID  = The ID of the client that is sending the acknowledgement
+			PacketStructures::NetworkMessage::TransportControl::requestID = The request ID. This *MUST* be the same as the request ID provided
+																			in the initial PAUSE request from the server.
+
+	1.6.3 STOP
+	----------
+	
+		A STOP transport control message will not contain any extra data past the 32 byte network message header.
+
+		To receive the message correctly, an incoming network message should still be constructed as described in (1.3 Receiving Data). The control
+		byte will be set to ControlBytes::STOP_PLAYBACK.
+	
+		The time at which to process the stop message. Typically this is set to the time at which the request was created on the server, which
+		indicates to the client that it should process the request immediately.
+	
+			PacketStructures::NetworkMessage::TransportControl::timeOffset
+
+		The client will also receive a corresponding requestID in
+
+			PacketStructures::NetworkMessage::TransportControl::requestID
+
+		This value is *crucial and required* when responding with an acknowledgement.
+		
+		==
+	
+		As soon as the client receives the transport control message, it absolutely must immediately send an acknowledgement packet back to the server.
+
+		The acknowledgement packet should be constructed as a PacketStructures::NetworkMessage with the following fields set:
+
+			PacketStructures::NetworkMessage::TransportControl::clientID  = The ID of the client that is sending the acknowledgement
+			PacketStructures::NetworkMessage::TransportControl::requestID = The request ID. This *MUST* be the same as the request ID provided
+																			in the initial STOP request from the server.
+
+		==
+
+		Additionally, the client may choose to drop any data that it has buffered. STOP is an indication that this track will not be played again. In any
+		event, it is certain that the server intends to rebuffer the tracks if they are played again.
+
+
+
+
+
+
+
+
+
+
+

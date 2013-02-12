@@ -600,12 +600,6 @@ namespace Networking {
 
 						playMessage.ControlByte = ControlBytes::BEGIN_PLAYBACK;
 						playMessage.TransportControl.requestID = this->currentRequestID;
-						
-						//Indicate that this is a PLAY operation, and that the clients should begin playback at the specified offset.
-						playMessage.Extra._extra = -1;
-
-						//Specify the offset at 0 for initial playback.
-						playMessage.TransportControl.timeOffset = 0;
 
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
@@ -644,9 +638,6 @@ namespace Networking {
 
 						playMessage.ControlByte = ControlBytes::BEGIN_PLAYBACK;
 						playMessage.TransportControl.requestID = this->currentRequestID;
-
-						//Indicate that this is a RESUME operation.
-						playMessage.Extra._extra = -1;
 
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
