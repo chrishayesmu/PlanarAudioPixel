@@ -8,6 +8,7 @@ namespace Networking {
 	///<summary>A set of PlaybackServer states.</summary>
 	enum PlaybackServerStates {
 		PlaybackServer_RUNNING = 1,
+		PlaybackServer_INVALID = 2,
 		PlaybackServer_STOPPED = 3
 	};
 	typedef PlaybackServerStates PlaybackServerState;
@@ -24,7 +25,7 @@ namespace Networking {
 	///<summary>A set of PlaybackServer error codes for the return values of certain functions.</summary>
 	enum PlaybackServerErrorCodes {
 		PlaybackServer_OK = 0,
-		PlaybackServer_INVALID = 1,
+		PlaybackServer_ISINVALID = 1,
 		PlaybackServer_FILE = 2,
 		PlaybackServer_POINTER = 3
 	};
@@ -42,7 +43,8 @@ namespace Networking {
 			PlaybackServer_PAUSE,
 			PlaybackServer_STOP,
 			PlaybackServer_BUFFER,
-			PlaybackServer_NEW_TRACK //,
+			PlaybackServer_NEW_TRACK,
+			PlaybackServer_TIMER_TICK //,
 			//PlaybackServer_Seek,
 			//PlaybackServer_Restart, etc.
 		};
@@ -93,6 +95,19 @@ namespace Networking {
 		HANDLE serverMainThread, serverReceivingThread;
 
 		PlaybackState playbackState;
+		time_t playbackOffset;
+				
+		// Used to indicate whether or not a timer event needs to be consumed.
+		// The timer tick event will not produce a new tick until timerTicked is reset to false.
+		bool timerTicked;
+		
+		///<summary>Produces server timer-tick events.</summary>
+		void timerTickEvent();
+		///<summary>Multithreaded router function that calls timerTickEvent().</summary>
+		static DWORD __stdcall timerRoute(void* server);
+
+		// Used to give the timer a chance to complete when the server object destructs.
+		CRITICAL_SECTION timerDestroyedCriticalSection;
 
 		// Track buffer object
 		TrackBuffer tracks;

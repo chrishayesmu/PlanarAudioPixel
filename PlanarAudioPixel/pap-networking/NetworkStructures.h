@@ -134,9 +134,6 @@ namespace Networking
 		// The length, in microseconds, of this track.
 		time_t trackLength;
 
-		// The index of the last sample that was buffered
-		unsigned int samplesBuffered;
-
 		// A buffer for the position data for each sample.
 		PositionBuffer positionData;
 		
@@ -253,7 +250,8 @@ namespace Networking
 			// they are to be considered alignment padding.
 			union {
 				char   _data[8];
-				size_t _dataLength;
+				int64_t _dataLength;
+				int64_t _extra;
 			} Extra;
 
 		};
