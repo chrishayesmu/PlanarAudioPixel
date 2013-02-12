@@ -16,6 +16,13 @@ namespace Networking {
 			client.Offset = message->ClientConnection.position;
 			client.LastCheckInTime = getMicroseconds();
 			
+			//If the client doesn't exist, fire the ClientConnected event
+			if (Networking::ClientInformationTable.find(client.ClientID) == Networking::ClientInformationTable.end()) {
+				for (int i = 0; i < this->clientConnectedCallbacks.size(); ++i) {
+					this->clientConnectedCallbacks[i](client);
+				}
+			}
+
 			//Add the client to the information table
 			Networking::ClientInformationTable[client.ClientID] = client;
 
@@ -28,6 +35,11 @@ namespace Networking {
 			
 			//Update the timestamp
 			Networking::ClientInformationTable[message->ClientConnection.clientID].LastCheckInTime = getMicroseconds();
+
+			//Raise the ClientCheckIn event
+			for (int i = 0; i < this->clientCheckInCallbacks.size(); ++i) {
+				this->clientCheckInCallbacks[i](Networking::ClientInformationTable[message->ClientConnection.clientID]);
+			}
 
 			//TODO: Check if the position changed.
 
@@ -406,6 +418,9 @@ namespace Networking {
 						}
 
 					}
+
+					//Check to see if any clients have timedout
+
 
 					//Indicate that this timer tick was consumed
 					this->timerTicked = false;
@@ -995,7 +1010,7 @@ namespace Networking {
 		///<param name="callback">The callback function to call when the corresponding request completes.</param>
 		///<param name="token">An identifying token that is passed along with the callback when the corresponding request complete.</param>
 		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
-		PlaybackServerErrorCode PlaybackServer::AddTrack(char* audioFilename, char* positionFilename, void (*callback)(int audioCode, int positionCode, uint64_t token), uint64_t token){
+		PlaybackServerErrorCode PlaybackServer::AddTrack(char* audioFilename, char* positionFilename, AddTrackCallback callback, uint64_t token){
 			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
 				return PlaybackServerErrorCodes::PlaybackServer_ISINVALID;
 
@@ -1008,5 +1023,23 @@ namespace Networking {
 			this->queueRequest(PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK, data);
 
 			return PlaybackServerErrorCodes::PlaybackServer_OK;
+		}
+
+		///<summary>Subscribes the caller to the ClientConnected event. ClientConnected is raised when a new client appears on the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void PlaybackServer::OnClientConnected(ClientConnectedCallback callback) {
+			this->clientConnectedCallbacks.push_back(callback);
+		}
+
+		///<summary>Subscribes the caller to the ClientDisconnected event. ClientDisconnected is raised when a client disconnects from the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void PlaybackServer::OnClientDisconnected(ClientConnectedCallback callback) {
+			this->clientDisconnectedCallbacks.push_back(callback);
+		}
+
+		///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void PlaybackServer::OnClientCheckIn(ClientCheckInCallback callback) {
+			this->clientCheckInCallbacks.push_back(callback);
 		}
 }

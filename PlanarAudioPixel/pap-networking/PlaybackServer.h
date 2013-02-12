@@ -31,6 +31,12 @@ namespace Networking {
 	};
 	typedef PlaybackServerErrorCodes PlaybackServerErrorCode;
 
+	/// Public typedefs for callback functions
+	typedef void (*AddTrackCallback)(int audioCode, int positionCode, uint64_t token);
+	typedef void (*ClientConnectedCallback)(Client c);
+	typedef void (*ClientDisconnectedCallback)(Client c);
+	typedef void (*ClientCheckInCallback)(Client c);
+
 	///<summary>A class that handles networking and audio data for managing a set of speaker nodes.</summary>
 	class PlaybackServer {
 	private:
@@ -60,7 +66,7 @@ namespace Networking {
 
 				//Callback information
 				uint64_t token;
-				void (*callback)(int audioErrorCode, int positionErrorCode, uint64_t token);
+				AddTrackCallback callback;
 			} newTrackInfo;
 
 			//Information used to queue a BUFFER request
@@ -130,6 +136,11 @@ namespace Networking {
 		typedef std::map<trackid_t, std::map<sampleid_t, time_t>>::iterator ResendRequestIterator;
 		std::map<trackid_t, std::map<sampleid_t, time_t>> sampleResendRequests;
 		std::map<trackid_t, std::map<sampleid_t, time_t>> volumeResendRequests;
+
+		// Callback subscriptions
+		std::vector<ClientConnectedCallback> clientConnectedCallbacks;
+		std::vector<ClientDisconnectedCallback> clientDisconnectedCallbacks;
+		std::vector<ClientCheckInCallback> clientCheckInCallbacks;
 
 		//Construction/destruction
 		PlaybackServer();
@@ -250,7 +261,19 @@ namespace Networking {
 		///<param name="callback">The callback function to call when the corresponding request completes.</param>
 		///<param name="token">An identifying token that is passed along with the callback when the corresponding request complete.</param>
 		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
-		PlaybackServerErrorCode AddTrack(char* audioFilename, char* positionFilename, void (*callback)(int audioCode, int positionCode, uint64_t token), uint64_t token);
+		PlaybackServerErrorCode AddTrack(char* audioFilename, char* positionFilename, AddTrackCallback callback, uint64_t token);
+		
+		///<summary>Subscribes the caller to the ClientConnected event. ClientConnected is raised when a new client appears on the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void OnClientConnected(ClientConnectedCallback callback);
+
+		///<summary>Subscribes the caller to the ClientDisconnected event. ClientDisconnected is raised when a client disconnects from the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void OnClientDisconnected(ClientConnectedCallback callback);
+
+		///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void OnClientCheckIn(ClientCheckInCallback callback);
 
 	};
 
