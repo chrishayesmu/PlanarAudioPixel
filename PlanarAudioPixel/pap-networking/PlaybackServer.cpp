@@ -27,6 +27,12 @@ namespace Networking {
 			//Add the client to the information table
 			Networking::ClientInformationTable[client.ClientID] = client;
 
+			//Send the acknowledgement to the client
+			PacketStructures::NetworkMessage connectionAcknowledgement;
+			connectionAcknowledgement.ControlByte = ControlBytes::NEW_CONNECTION;
+			this->sendSocket->SendMessage((char*)&connectionAcknowledgement, sizeof(PacketStructures::NetworkMessage));
+
+
 		}
 
 		///<summary>Updates the client information table for the client that sent the check in.</summary>

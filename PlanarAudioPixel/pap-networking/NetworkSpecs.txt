@@ -1,0 +1,33 @@
+
+Network Specifications
+=================================
+
+Client                   1.
+Server                   2.
+
+1. Client
+----------
+
+Connecting               1.1
+Sending Check-Ins        1.2
+
+
+
+
+1.1 Connecting
+--------------
+
+	To connect to the server, a client must construct and send a PacketStructures::NeworkMessage with the control byte set to ControlBytes::NEW_CONNECTION.
+
+
+1.2 Sending Check-Ins
+---------------------
+
+	The client must construct and send a PacketStructures::NetworkMessage with the control byte set to ControlBytes::PERIODIC_CHECK_IN and the
+	PacketStructures::NetworkMessage::ClientCheckIn filled in appropriately. It should do this WITHIN at least every CLIENT_CHECKIN_DELAY number
+	of milliseconds.
+
+	If the client fails to send a check in message within CLIENT_CHECKIN_DELAY milliseconds, it will be dropped and be refused further check ins.
+
+	If the client is dropped, it will receive a network message with the ControlBytes::DISCONNECT control byte. If the client successfully receives
+	this message, it can send a new connection message to reconnect.
