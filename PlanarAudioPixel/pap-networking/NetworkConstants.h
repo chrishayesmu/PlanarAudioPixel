@@ -5,8 +5,10 @@
 //
 // Author: Chris Hayes
 // -----------------------------------------------------------------
+#pragma once
 
 #include "ControlByteConstants.h"
+#include <stdint.h>
 
 namespace Networking
 {
@@ -19,5 +21,9 @@ namespace Networking
 	// rounds the volume calculation down to 0. This is used to prevent clients from
 	// wasting time playing samples at a volume which could not be heard.
 	const float MIN_VOLUME_THRESHOLD = 0.025f;
+
+	// The frequency of check ins, in ms delay. That is, a check in should be sent
+	// every CLIENT_CHECKIN_DELAY milliseconds to be considered active.
+	const int64_t CLIENT_CHECKIN_DELAY = 300 /*ms*/;
 
 }

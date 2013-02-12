@@ -247,6 +247,12 @@ namespace Networking
 					};
 				} TransportControl;
 
+				// [16] Server to Client - Disconnect message
+				struct {
+					/* [8] */ ClientGUID clientID;
+					/* [8] explicit padding */ unsigned char _pad[8];
+				} DisconnectNotification;
+
 			};
 
 			// If extra data exists, it starts at (data + 8). If these 8 bytes are unused by the receiving function,

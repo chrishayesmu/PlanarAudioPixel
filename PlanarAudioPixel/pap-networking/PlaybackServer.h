@@ -201,6 +201,10 @@ namespace Networking {
 		///<param name="bufferRangeStartID">The ID of the first sample in the buffering range.</param>
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
 		void sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID);
+
+		///<summary>Sends a disconnect packet to a particular client.</summary>
+		///<param name="clientID">The ID of the client to which this message applies</param>
+		void sendDisconnect(ClientGUID clientID);
 		
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
 		///<param name="datagram">The network message.</param>

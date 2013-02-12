@@ -2,6 +2,7 @@
 #include "Socket.h"
 #include "NetworkGlobals.h"
 #include "ControlByteConstants.h"
+#include "NetworkConstants.h"
 
 namespace Networking {
 		
@@ -33,6 +34,10 @@ namespace Networking {
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::receiveClientCheckIn(const PacketStructures::NetworkMessage* message, int dataSize) {
 			
+			//Clients that haven't formally connected and maintained a connection shouldn't be checking in.
+			if (Networking::ClientInformationTable.find(message->ClientCheckIn.clientID) == Networking::ClientInformationTable.end()) 
+				return;
+
 			//Update the timestamp
 			Networking::ClientInformationTable[message->ClientConnection.clientID].LastCheckInTime = getMicroseconds();
 
@@ -284,6 +289,16 @@ namespace Networking {
 
 		}
 
+		///<summary>Sends a disconnect packet to a particular client.</summary>
+		///<param name="clientID">The ID of the client to which this message applies</param>
+		void PlaybackServer::sendDisconnect(ClientGUID clientID) {
+
+			PacketStructures::NetworkMessage disconnectMessage;
+			disconnectMessage.DisconnectNotification.clientID = clientID;
+			this->sendSocket->SendMessage((char*)&disconnectMessage, sizeof(PacketStructures::NetworkMessage));
+
+		}
+
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
 		///<param name="message">The network message.</param>
 		///<param name="datagramSize">The size of the datagram.</param>
@@ -397,6 +412,11 @@ namespace Networking {
 				PacketStructures::NetworkMessage transportControlRequest;
 				//==============
 
+				//Timer_Tick-Request variables
+				time_t cTime;
+				std::vector<ClientGUID> clientDropList;
+				//==============
+
 				switch (request.controlCode){
 
 					//Process timer tick events
@@ -419,8 +439,17 @@ namespace Networking {
 
 					}
 
-					//Check to see if any clients have timedout
-
+					//Check to see if any clients have timeout
+					cTime = getMicroseconds();
+					for (ClientIterator i = Networking::ClientInformationTable.begin(); i != Networking::ClientInformationTable.end(); ++i) {
+						//If the time between check-ins exceeds CLIENT_CHECKIN_DELAY milliseconds, drop the client
+						if ((cTime - i->second.LastCheckInTime) / 1000 > CLIENT_CHECKIN_DELAY) {
+							this->sendDisconnect(i->second.ClientID);
+							clientDropList.push_back(i->second.ClientID);
+						}
+					}
+					for (int i = 0; i < clientDropList.size(); ++i)
+						Networking::ClientInformationTable.erase(clientDropList[i]);
 
 					//Indicate that this timer tick was consumed
 					this->timerTicked = false;
