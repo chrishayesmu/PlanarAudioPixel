@@ -10,15 +10,56 @@ namespace PlanarAudioPixel {
 		PlaybackServer::_TrackCallback->Remove(token);
 	}
 
+	//Event callback chaining functions
+
+	static void clientConnectedChain(Networking::Client c) {
+		Client clientChain;
+		clientChain.ClientID.BroadcastIP.RawIP = c.ClientID.BroadcastIP.RawIP;
+		clientChain.ClientID.LocalIP.RawIP = c.ClientID.LocalIP.RawIP;
+		clientChain.LastCheckInTime = c.LastCheckInTime;
+		clientChain.Offset.x = c.Offset.x;
+		clientChain.Offset.y = c.Offset.y;
+
+		for (int i = 0; i < PlaybackServer::_ClientConnectedCallbacks->Count; ++i)
+			PlaybackServer::_ClientConnectedCallbacks[i]->Invoke(clientChain);
+	}
+
+	static void clientDisconnectedChain(Networking::Client c) {
+		Client clientChain;
+		clientChain.ClientID.BroadcastIP.RawIP = c.ClientID.BroadcastIP.RawIP;
+		clientChain.ClientID.LocalIP.RawIP = c.ClientID.LocalIP.RawIP;
+		clientChain.LastCheckInTime = c.LastCheckInTime;
+		clientChain.Offset.x = c.Offset.x;
+		clientChain.Offset.y = c.Offset.y;
+
+		for (int i = 0; i < PlaybackServer::_ClientConnectedCallbacks->Count; ++i)
+			PlaybackServer::_ClientDisconnectedCallbacks[i]->Invoke(clientChain);
+	}
+
+	static void clientCheckInChain(Networking::Client c) {
+		Client clientChain;
+		clientChain.ClientID.BroadcastIP.RawIP = c.ClientID.BroadcastIP.RawIP;
+		clientChain.ClientID.LocalIP.RawIP = c.ClientID.LocalIP.RawIP;
+		clientChain.LastCheckInTime = c.LastCheckInTime;
+		clientChain.Offset.x = c.Offset.x;
+		clientChain.Offset.y = c.Offset.y;
+
+		for (int i = 0; i < PlaybackServer::_ClientConnectedCallbacks->Count; ++i)
+			PlaybackServer::_ClientCheckInCallbacks[i]->Invoke(clientChain);
+	}
+
+
 	///<summary>Constructs a playback server foreign function interface class.</summary>
 	PlaybackServer::PlaybackServer(){
-
-
 
 		Networking::PlaybackServer* server;
 		if (SOCKETFAILED(Networking::PlaybackServer::Create(&server))){
 			throw gcnew Exception(L"Could not create the playback server.");
 		}
+
+		server->OnClientConnected(&clientConnectedChain);
+		server->OnClientDisconnected(&clientDisconnectedChain);
+		server->OnClientCheckIn(&clientCheckInChain);
 
 		this->server = server;
 
@@ -113,5 +154,25 @@ namespace PlanarAudioPixel {
 		}
 
 	}
+
+			
+	///<summary>Subscribes the caller to the ClientConnected event. ClientConnected is raised when a new client appears on the network.</summary>
+	///<param name="callback">A pointer to the function to call when the event is raised.</param>
+	void PlaybackServer::OnClientConnected(ClientConnectedCallback^ callback) {
+		PlaybackServer::_ClientConnectedCallbacks->Add(callback);
+	}
+
+	///<summary>Subscribes the caller to the ClientDisconnected event. ClientDisconnected is raised when a client disconnects from the network.</summary>
+	///<param name="callback">A pointer to the function to call when the event is raised.</param>
+	void PlaybackServer::OnClientDisconnected(ClientDisconnectedCallback^ callback) {
+		PlaybackServer::_ClientDisconnectedCallbacks->Add(callback);
+	}
+
+	///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
+	///<param name="callback">A pointer to the function to call when the event is raised.</param>
+	void PlaybackServer::OnClientCheckIn(ClientCheckInCallback^ callback) {
+		PlaybackServer::_ClientCheckInCallbacks->Add(callback);
+	}
+
 
 };

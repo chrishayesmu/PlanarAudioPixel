@@ -3,6 +3,8 @@
 #include "../pap-networking/PlaybackServer.h"
 #pragma comment(lib, "../Debug/pap-networking.lib")
 
+#include "PlaybackStructures.h"
+
 using namespace System;
 
 namespace PlanarAudioPixel {
@@ -18,9 +20,21 @@ namespace PlanarAudioPixel {
 
 	//Callback delegate for adding a track
 	public delegate void AddTrackCallback(int audioFileErrorCode, int positionFileErrorCode);
-		
 	///<summary>Provides a chaining callback to link the unmanaged world back to the managed world.</summary>
 	static void trackCallback(int audioCode, int positionCode, uint64_t token);
+
+	//==================================
+	//Callback delegates and chaining functions for events
+	
+	public delegate void ClientConnectedCallback(Client c);
+	static void clientConnectedChain(Networking::Client c);
+
+	public delegate void ClientDisconnectedCallback(Client c);
+	static void clientDisconnectedChain(Networking::Client c);
+
+	public delegate void ClientCheckInCallback(Client c);
+	static void clientCheckInChain(Networking::Client c);
+
 
 	///<summary>Main interface class to access lower level Networking::PlaybackServer.</summary>
 	public ref class PlaybackServer {
@@ -32,6 +46,10 @@ namespace PlanarAudioPixel {
 	public:
 		
 		static System::Collections::Generic::Dictionary<uint64_t, AddTrackCallback^>^ _TrackCallback = gcnew System::Collections::Generic::Dictionary<uint64_t, AddTrackCallback^>();
+
+		static System::Collections::Generic::List<ClientConnectedCallback^>^ _ClientConnectedCallbacks = gcnew System::Collections::Generic::List<ClientConnectedCallback^>();
+		static System::Collections::Generic::List<ClientDisconnectedCallback^>^ _ClientDisconnectedCallbacks = gcnew System::Collections::Generic::List<ClientDisconnectedCallback^>();
+		static System::Collections::Generic::List<ClientCheckInCallback^>^ _ClientCheckInCallbacks = gcnew System::Collections::Generic::List<ClientCheckInCallback^>();
 
 		///<summary>Constructs a playback server foreign function interface class.</summary>
 		PlaybackServer();
@@ -64,6 +82,18 @@ namespace PlanarAudioPixel {
 		///<param name="callback">The delegate callback to fire when this request finishes processing.</param>
 		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
 		void AddTrack(System::String^ audioFilename, System::String^ positionFilename, AddTrackCallback^ callback);
+			
+		///<summary>Subscribes the caller to the ClientConnected event. ClientConnected is raised when a new client appears on the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void OnClientConnected(ClientConnectedCallback^ callback);
+
+		///<summary>Subscribes the caller to the ClientDisconnected event. ClientDisconnected is raised when a client disconnects from the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void OnClientDisconnected(ClientDisconnectedCallback^ callback);
+
+		///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
+		///<param name="callback">A pointer to the function to call when the event is raised.</param>
+		void OnClientCheckIn(ClientCheckInCallback^ callback);
 
 	};
 	

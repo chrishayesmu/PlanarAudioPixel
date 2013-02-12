@@ -446,6 +446,12 @@ namespace Networking {
 						if ((cTime - i->second.LastCheckInTime) / 1000 > CLIENT_CHECKIN_DELAY) {
 							this->sendDisconnect(i->second.ClientID);
 							clientDropList.push_back(i->second.ClientID);
+
+							//Raise the event for this client's disconnect
+							for (int j = 0; j < this->clientDisconnectedCallbacks.size(); ++i) {
+								this->clientDisconnectedCallbacks[j](i->second);
+							}
+
 						}
 					}
 					for (int i = 0; i < clientDropList.size(); ++i)
@@ -1062,7 +1068,7 @@ namespace Networking {
 
 		///<summary>Subscribes the caller to the ClientDisconnected event. ClientDisconnected is raised when a client disconnects from the network.</summary>
 		///<param name="callback">A pointer to the function to call when the event is raised.</param>
-		void PlaybackServer::OnClientDisconnected(ClientConnectedCallback callback) {
+		void PlaybackServer::OnClientDisconnected(ClientDisconnectedCallback callback) {
 			this->clientDisconnectedCallbacks.push_back(callback);
 		}
 

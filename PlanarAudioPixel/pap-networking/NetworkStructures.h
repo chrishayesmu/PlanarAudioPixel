@@ -20,7 +20,7 @@ namespace Networking
 	union IP_Address
 	{
 		// The 4-byte IP address, stored as an integer.
-		unsigned int RawIP;
+		uint32_t RawIP;
 
 		struct
 		{

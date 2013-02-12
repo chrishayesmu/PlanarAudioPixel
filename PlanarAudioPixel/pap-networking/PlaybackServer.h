@@ -273,7 +273,7 @@ namespace Networking {
 
 		///<summary>Subscribes the caller to the ClientDisconnected event. ClientDisconnected is raised when a client disconnects from the network.</summary>
 		///<param name="callback">A pointer to the function to call when the event is raised.</param>
-		void OnClientDisconnected(ClientConnectedCallback callback);
+		void OnClientDisconnected(ClientDisconnectedCallback callback);
 
 		///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
 		///<param name="callback">A pointer to the function to call when the event is raised.</param>
