@@ -43,6 +43,24 @@ namespace PlanarAudioPixel {
 		}
 	}
 
+	///<summary>Attempts to pause playback.</summary>
+	///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+	void PlaybackServer::Pause() {
+		Networking::PlaybackServerErrorCode result = this->server->Pause();
+		if (result != Networking::PlaybackServerErrorCodes::PlaybackServer_OK) {
+			throw gcnew Exception(L"The server has not been started or is in an invalid state.");
+		}
+	}
+
+	///<summary>Attempts to stop playback.</summary>
+	///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+	void PlaybackServer::Stop() {
+		Networking::PlaybackServerErrorCode result = this->server->Stop();
+		if (result != Networking::PlaybackServerErrorCodes::PlaybackServer_OK) {
+			throw gcnew Exception(L"The server has not been started or is in an invalid state.");
+		}
+	}
+
 	///<summary>Queues up a request to asynchronously add a track to the server's playlist.</summary>
 	///<param name="audioFilename">The name of the audio file to add.</param>
 	///<param name="positionFilename">The name of the corresponding position data file.</param>

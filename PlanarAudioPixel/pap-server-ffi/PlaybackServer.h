@@ -43,7 +43,15 @@ namespace PlanarAudioPixel {
 		///<summary>Attempts to start playback.</summary>
 		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
 		void Play();
+		
+		///<summary>Attempts to pause playback.</summary>
+		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+		void Pause();
 
+		///<summary>Attempts to stop playback.</summary>
+		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
+		void Stop();
+		
 		///<summary>Queues up a request to asynchronously add a track to the server's playlist.</summary>
 		///<param name="audioFilename">The name of the audio file to add.</param>
 		///<param name="positionFilename">The name of the corresponding position data file.</param>
