@@ -445,7 +445,7 @@ namespace Networking {
 
 					}
 
-					//Check to see if any clients have timeout
+					//Check to see if any clients have timed out
 					cTime = getMicroseconds();
 					for (ClientIterator i = Networking::ClientInformationTable.begin(); i != Networking::ClientInformationTable.end(); ++i) {
 						//If the time between check-ins exceeds CLIENT_CHECKIN_DELAY milliseconds, drop the client
@@ -460,8 +460,18 @@ namespace Networking {
 
 						}
 					}
-					for (int i = 0; i < clientDropList.size(); ++i)
-						Networking::ClientInformationTable.erase(clientDropList[i]);
+					if (clientDropList.size()) {
+						EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+						for (int i = 0; i < clientDropList.size(); ++i) {
+							//Take the client out of the information table, and free up any current requests that may be waiting on it
+							Networking::ClientInformationTable.erase(clientDropList[i]);
+							ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].find(clientDropList[i]);
+							if (j != this->requestsAcknowledged[this->currentRequestID].end()) {
+								this->requestsAcknowledged[this->currentRequestID].erase(j->first);
+							}
+						}
+						LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
+					}
 
 					//Indicate that this timer tick was consumed
 					this->timerTicked = false;
@@ -618,12 +628,15 @@ namespace Networking {
 							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 							resend = false;
+							
+					EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
 							//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
 							for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
 								if (j->second) {
 									resend = true;
 									break;
 								}
+					LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 						}
 					
 						this->playbackState = PlaybackState::Playback_PLAYING;
@@ -656,12 +669,14 @@ namespace Networking {
 							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 							resend = false;
+					EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
 							//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
 							for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
 								if (j->second) {
 									resend = true;
 									break;
 								}
+					LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 						}
 					
 						this->playbackState = PlaybackState::Playback_PLAYING;
@@ -698,12 +713,14 @@ namespace Networking {
 						Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 						resend = false;
+					EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
 						//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
 						for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
 							if (j->second) {
 								resend = true;
 								break;
 							}
+					LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 
 					} while (resend);
 
@@ -734,12 +751,14 @@ namespace Networking {
 						Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 						resend = false;
+					EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
 						//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
 						for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
 							if (j->second) {
 								resend = true;
 								break;
 							}
+					LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 
 					} while (resend);
 
@@ -855,6 +874,7 @@ namespace Networking {
 			this->initialBuffering = false;
 			InitializeCriticalSection(&this->controlMessagesCriticalSection);
 			InitializeCriticalSection(&this->timerDestroyedCriticalSection);
+			InitializeCriticalSection(&this->requestsAcknowledgedCriticalSection);
 			this->controlMessagesResourceCount = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
 
 			//Create timer thread
@@ -886,6 +906,7 @@ namespace Networking {
 			DeleteCriticalSection(&this->timerDestroyedCriticalSection);
 
 			DeleteCriticalSection(&this->controlMessagesCriticalSection);
+			DeleteCriticalSection(&this->requestsAcknowledgedCriticalSection);
 		}
 
 		// ---------------------------------------------

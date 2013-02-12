@@ -131,6 +131,7 @@ namespace Networking {
 		
 		//requestid_t -> (ClientGUID -> bool)
 		std::map<requestid_t, std::map<ClientGUID, bool>> requestsAcknowledged;
+		CRITICAL_SECTION requestsAcknowledgedCriticalSection;
 
 		// Maintains a list of resend requests so that the network doesn't get spammed with resending the same sample
 		typedef std::map<trackid_t, std::map<sampleid_t, time_t>>::iterator ResendRequestIterator;
