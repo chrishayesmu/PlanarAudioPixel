@@ -19,6 +19,8 @@ namespace Networking
 
 	time_t getMicroseconds(){
 		FILETIME time;
+
+		// TODO: See about replacing this with less precise version
 		GetSystemTimePreciseAsFileTime(&time);
 		ULARGE_INTEGER lTime;
 		lTime.LowPart = time.dwLowDateTime;

@@ -31,8 +31,6 @@ namespace Networking {
 			PacketStructures::NetworkMessage connectionAcknowledgement;
 			connectionAcknowledgement.ControlByte = ControlBytes::NEW_CONNECTION;
 			this->sendSocket->SendMessage((char*)&connectionAcknowledgement, sizeof(PacketStructures::NetworkMessage));
-
-
 		}
 
 		///<summary>Updates the client information table for the client that sent the check in.</summary>
@@ -52,14 +50,14 @@ namespace Networking {
 				this->clientCheckInCallbacks[i](Networking::ClientInformationTable[message->ClientConnection.clientID]);
 			}
 
-			//TODO: Check if the position changed.
-
-		}
-
-		///<summary>Responds to a delay request sent by a client.</summary>
-		///<param name="clientID">The ID of the client to send the response to.</param>
-		void PlaybackServer::sendDelayResponseMessage(ClientGUID clientID) {
-
+			//Check if the client's position changed
+			if (message->ClientCheckIn.position.x != Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.x
+			 || message->ClientCheckIn.position.y != Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.y)
+			{
+				Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.x = message->ClientCheckIn.position.x;
+				Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.y = message->ClientCheckIn.position.y;
+				this->clientPositionsChanged();
+			}
 		}
 
 		///<summary>Responds to an audio data resend request.</summary>
@@ -116,7 +114,8 @@ namespace Networking {
 
 		}
 
-		///<summary>This function will be called in order to notify the server that one or more clients have moved, join, or dropped out, and that the volume must therefore be recalculated.</summary>
+		///<summary>This function will be called in order to notify the server that one or more clients have moved, 
+		/// joined, or dropped out, and that the volume must therefore be recalculated and resent.</summary>
 		void PlaybackServer::clientPositionsChanged() {
 
 		}
@@ -139,46 +138,7 @@ namespace Networking {
 			//Audio data struct setup
 			IO::AudioData audioData;
 
-			audioData.Data = (char*)malloc(sizeof(int) * 400 * 300);
-			audioData.DataLength = 400 * 300;
-			
-			//Number of bytes a sample needs
-			int bufferNeeds = 400 * 300 * sizeof(int);
-
-			//Time counter
-			time_t playbackOffset = 0;
-
-			do {
-				//Read 4096 bytes
-				readCount = fread(readBuffer, 1, 4096, audioFile);
-				if (!readCount) break;
-
-				//Copy memory as appropriate
-				if (bufferNeeds > readCount)
-					memcpy(audioData.Data, readBuffer, 4096);
-				else {
-					memcpy(audioData.Data, readBuffer, bufferNeeds);
-
-					AudioSample sample;
-					sample.SampleID = buffer.size();
-					sample.TimeOffset = playbackOffset;
-					playbackOffset += 100000;
-					sample.Data = audioData;
-
-					buffer[buffer.size()] = sample;
-
-					audioData.Data = (char*)malloc(sizeof(int) * 400 * 300);
-					audioData.DataLength = 400 * 300;
-
-					memcpy(audioData.Data, readBuffer, readCount - bufferNeeds);
-
-					bufferNeeds = 400 * 300 * sizeof(int) - (readCount - bufferNeeds);
-				}
-
-			} while(readCount == 4096);
-
-			//When the data fits perfectly, the last malloc is frivilous
-			free(audioData.Data);
+			// TODO - actually read from file
 
 			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}
@@ -200,20 +160,8 @@ namespace Networking {
 
 			//PositionInfo struct setup
 			PositionInfo positionData;
-			
-			do {
-				//Read 4096 bytes
-				readCount = fread(readBuffer, 1, 4096, audioFile);
-				if (!readCount) break;
-				
-				//Process position data
-				for (int i = 0; i < readCount; i+=2*sizeof(float)){
-					positionData.x = *((float*)(&readBuffer[i]));
-					positionData.y = *((float*)(&readBuffer[i+sizeof(float)]));
-					buffer[buffer.size()] = positionData;
-				}
 
-			} while(readCount == 4096);
+			// TODO - actually read from file
 			
 			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}
@@ -784,8 +732,6 @@ namespace Networking {
 						request.controlData.newTrackInfo.callback(audioCode, positionCode, request.controlData.newTrackInfo.token);
 
 					break;
-
-
 				}
 
 			} while (this->state != PlaybackServerStates::PlaybackServer_STOPPED);
@@ -859,7 +805,6 @@ namespace Networking {
 
 			//Signal the new request
 			ReleaseSemaphore(this->controlMessagesResourceCount, 1, NULL);
-
 		}
 		
 		///<summary>Constructs a PlaybackServer object.</summary>

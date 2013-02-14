@@ -50,9 +50,7 @@ namespace Networking {
 			PlaybackServer_STOP,
 			PlaybackServer_BUFFER,
 			PlaybackServer_NEW_TRACK,
-			PlaybackServer_TIMER_TICK //,
-			//PlaybackServer_Seek,
-			//PlaybackServer_Restart, etc.
+			PlaybackServer_TIMER_TICK
 		};
 		typedef PlaybackServerRequestCodes PlaybackServerRequestCode;
 
@@ -151,10 +149,6 @@ namespace Networking {
 		///<param name="data">The message data.</param>
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void receiveClientConnection(const PacketStructures::NetworkMessage* message, int dataSize);
-
-		///<summary>Responds to a delay request sent by a client.</summary>
-		///<param name="clientID">The ID of the client to send the response to.</param>
-		void sendDelayResponseMessage(ClientGUID clientID);
 
 		///<summary>Responds to an audio data resend request.</summary>
 		///<param name="data">The message data.</summary>
@@ -279,8 +273,5 @@ namespace Networking {
 		///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
 		///<param name="callback">A pointer to the function to call when the event is raised.</param>
 		void OnClientCheckIn(ClientCheckInCallback callback);
-
 	};
-
-
 };
