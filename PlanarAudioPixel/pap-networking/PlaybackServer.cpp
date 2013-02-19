@@ -328,7 +328,7 @@ namespace Networking {
 			}
 
 		}
-		///<summary>Multithreaded router function that calls serverReceieve().</summary>
+		///<summary>Multithreaded router function that calls serverReceive().</summary>
 		DWORD PlaybackServer::serverRouteReceive(void* server){
 			static_cast<PlaybackServer*>(server)->serverReceive();
 			return 0;
