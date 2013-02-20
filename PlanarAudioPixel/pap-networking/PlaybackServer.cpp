@@ -3,6 +3,9 @@
 #include "NetworkGlobals.h"
 #include "ControlByteConstants.h"
 #include "NetworkConstants.h"
+#include "../pap-file-io/Logger.h"
+
+#pragma comment(lib, "../Debug/pap-file-io.lib")
 
 namespace Networking {
 		
@@ -337,6 +340,9 @@ namespace Networking {
 		///<summary>Handles server management and control messages.</summary>
 		void PlaybackServer::serverMain(){
 			this->playbackState = PlaybackStates::Playback_STOPPED;
+
+			Logger::openLogFile();
+			Logger::logNotice("Server started up");
 
 			do {
 				//Wait for a control message resource

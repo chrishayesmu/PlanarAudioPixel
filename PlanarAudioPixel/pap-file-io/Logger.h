@@ -37,6 +37,8 @@
 
 #pragma once
 
+#include <stdarg.h>
+
 namespace Logger
 {
 	/// <summary>Opens a log file with the default naming convention for writing.</summary>

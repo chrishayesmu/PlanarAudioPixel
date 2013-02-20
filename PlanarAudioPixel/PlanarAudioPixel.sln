@@ -6,12 +6,28 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pap-file-io", "pap-file-io\pap-file-io.vcxproj", "{F1001C1F-7E96-4394-82EF-C8EAABEAE98F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playback GUI", "Playback GUI\Playback GUI.csproj", "{956D9455-B26B-47E0-8AF4-390B6FDA6C62}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F1001C1F-7E96-4394-82EF-C8EAABEAE98F} = {F1001C1F-7E96-4394-82EF-C8EAABEAE98F}
+		{CAFEE72A-A122-4E50-9579-0E3139356D9C} = {CAFEE72A-A122-4E50-9579-0E3139356D9C}
+		{3AE7C63F-72CB-44ED-B82E-1B5F926B5679} = {3AE7C63F-72CB-44ED-B82E-1B5F926B5679}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Recording GUI 2", "Recording GUI 2\Recording GUI 2.csproj", "{5F571539-08BF-45E3-8E5B-ACCF595051C9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F1001C1F-7E96-4394-82EF-C8EAABEAE98F} = {F1001C1F-7E96-4394-82EF-C8EAABEAE98F}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pap-server-ffi", "pap-server-ffi\pap-server-ffi.vcxproj", "{CAFEE72A-A122-4E50-9579-0E3139356D9C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F1001C1F-7E96-4394-82EF-C8EAABEAE98F} = {F1001C1F-7E96-4394-82EF-C8EAABEAE98F}
+		{3AE7C63F-72CB-44ED-B82E-1B5F926B5679} = {3AE7C63F-72CB-44ED-B82E-1B5F926B5679}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlaybackServerTest", "PlaybackServerTest\PlaybackServerTest.csproj", "{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F1001C1F-7E96-4394-82EF-C8EAABEAE98F} = {F1001C1F-7E96-4394-82EF-C8EAABEAE98F}
+		{3AE7C63F-72CB-44ED-B82E-1B5F926B5679} = {3AE7C63F-72CB-44ED-B82E-1B5F926B5679}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,6 +1,7 @@
 #include "Logger.h"
 
 #ifndef PAP_NO_LOGGING
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,8 +18,8 @@
 namespace Logger
 {
 	// Internal function for logging; all other log functions call this one.
-	// Adds timestamp and formatting to log message. 
-	void log(const char* messageType, const char* format, ...);
+	// Adds timestamp and formatting to log message.
+	void log(const char* messageType, const char* format, va_list args);
 
 	// Pointer to the file to use for logging. Should be set to NULL whenever closed.
 	FILE* logFilePtr = NULL;
@@ -45,7 +46,7 @@ namespace Logger
 		tm* curDate = localtime(&curTime);
 
 		// Format the date appropriately
-		strftime(dateBuffer, 30, "log-%m-%d-%Y.txt", curDate);
+		strftime(dateBuffer, 19, "log-%m-%d-%Y.txt", curDate);
 
 		openLogFile(dateBuffer, false);
 #endif
@@ -64,7 +65,7 @@ namespace Logger
 	{
 #ifndef PAP_NO_LOGGING
 		FILE* newLogFilePtr = replace ? fopen(filePath, "w") : fopen(filePath, "a");
-
+		
 		if (logFilePtr && newLogFilePtr) // Log file already open
 		{
 			logWarning("Attempting to open new log file (%s) without closing old log file", filePath);
@@ -110,7 +111,7 @@ namespace Logger
 	{
 #ifndef PAP_NO_LOGGING
 		va_list args;
-		va_start(format, args);
+		va_start(args, format);
 		log("NOTICE", format, args);
 		va_end(args);
 #endif
@@ -124,7 +125,7 @@ namespace Logger
 	{
 #ifndef PAP_NO_LOGGING
 		va_list args;
-		va_start(format, args);
+		va_start(args, format);
 		log("WARNING", format, args);
 		va_end(args);
 #endif
@@ -138,7 +139,7 @@ namespace Logger
 	{
 #ifndef PAP_NO_LOGGING
 		va_list args;
-		va_start(format, args);
+		va_start(args, format);
 		log("ERROR", format, args);
 		va_end(args);
 #endif
@@ -147,11 +148,11 @@ namespace Logger
 	void log(const char* messageType, const char* format, va_list args)
 	{
 #ifndef PAP_NO_LOGGING
-		if (!logFilePtr)
+		if (!Logger::logFilePtr)
 			throw "Attempted to write log with no log file open!";
 		
-		char dateBuffer[50];
-		char logFormatBuffer[1000]; // allocate lots of buffer room because why the hell not
+		char dateBuffer[24];
+		char logFormatBuffer[2000]; // allocate lots of buffer room because why the hell not
 
 		// Retrieve the time then convert it into a date
 		time_t curTime;
@@ -159,13 +160,13 @@ namespace Logger
 		tm* curDate = localtime(&curTime);
 
 		// Format the date appropriately
-		strftime(dateBuffer, 30, "%D %r", curDate);
+		strftime(dateBuffer, 24, "(%m-%d-%Y %I:%M:%S%p)", curDate);
 
 		// Copy date, message type and format string into this function's own format string
-		sprintf(logFormatBuffer, "(%s) %-10s %s\n", dateBuffer, messageType, format);
+		sprintf(logFormatBuffer, "%-25s %-9s %s\n", dateBuffer, messageType, format);
 
 		// Write to file using the new format string
-		vfprintf(logFilePtr, logFormatBuffer, args);
+		vfprintf(Logger::logFilePtr, logFormatBuffer, args);
 #endif
 	}
 }
