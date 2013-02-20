@@ -14,6 +14,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.IO;
+using System.Timers;
 
 namespace Recording_GUI_2
 {
@@ -23,9 +24,11 @@ namespace Recording_GUI_2
 
     public partial class MainWindow : Window
     {
+        Timer timer = new Timer();
         private string filename;
         private MediaPlayer mplayer = new MediaPlayer();
         private DispatcherTimer _timer;
+        private string mousePositionFileString;
 
         public MainWindow()
         {
@@ -56,15 +59,15 @@ namespace Recording_GUI_2
                     _timer.Interval = TimeSpan.FromSeconds(timelineSlider.StepFrequency);
                     StartTimer();
                 }
-
+        */
                 private void _timer_Tick(object sender, object e)
                 {
-                    if (!_sliderpressed)
-                    {
-                        timelineSlider.Value = mplayer.Position.TotalSeconds;
-                    }
+                    //Record the mouse position over time
+                    string mousePosition = Mouse.GetPosition(Application.Current.MainWindow).ToString();
+                    //MessageBoxResult result = MessageBox.Show(mousePosition);
+                    mousePositionFileString += mousePosition;
                 }
-
+        
                 private void StartTimer()
                 {
                     _timer.Tick += _timer_Tick;
@@ -76,7 +79,7 @@ namespace Recording_GUI_2
                     _timer.Stop();
                     _timer.Tick -= _timer_Tick;
                 }
-
+        /*
                 private double SliderFrequency(TimeSpan timevalue)
                 {
                     double stepfrequency = -1;
@@ -113,18 +116,27 @@ namespace Recording_GUI_2
         //Record mouse movements here
         void audioMediaElement_MediaOpened(object sender, RoutedEventArgs e)
         {
-            string mousePosition = Mouse.GetPosition(Application.Current.MainWindow).ToString();
-            MessageBoxResult result = MessageBox.Show(mousePosition);
-            MessageBoxResult results = MessageBox.Show("Audio is playing");
+            mousePositionFileString = "";
+            //MessageBoxResult results = MessageBox.Show("Audio is playing");
+            StartTimer();
         }
 
         //Called when the audio has finished playing
         //Save the mouse movements to a file here
         public void audioMediaElement_MediaEnded(object sender, RoutedEventArgs e)
         {
-            //StopTimer();
+            StopTimer();
+            //Reset the slider to 0
             timelineSlider.Value = 0.0;
-            MessageBoxResult results = MessageBox.Show("Audio finished playing");
+
+            //Write the mouse position data to the file
+            string mydocpath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            using (StreamWriter outfile = new StreamWriter(mydocpath + @"\AllTxtFiles.txt"))
+            {
+                outfile.Write(mousePositionFileString.ToString());
+            }
+
+            //MessageBoxResult results = MessageBox.Show("Audio finished playing");
         }
 
         //Called when there is an error opening the file
