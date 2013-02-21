@@ -8,11 +8,11 @@
             <RowDefinition Height="122*"/>
             <RowDefinition Height="297*"/>
         </Grid.RowDefinitions>
-        <Rectangle Fill="#FFF4F4F5" HorizontalAlignment="Left" Height="250" Margin="87,28,0,0" Stroke="Black" VerticalAlignment="Top" Width="417" Grid.RowSpan="2"/>
+        <Rectangle x:Name="recordingRectangle" Fill="#FFF4F4F5" Height="247" Margin="0,24,0,0" Stroke="Black" VerticalAlignment="Top" Width="419" Grid.RowSpan="2" HorizontalAlignment="Center"/>
 
-        <Label Name="FileNameLabel" Content="File Name" HorizontalAlignment="Left" Margin="87,161,0,0" VerticalAlignment="Top" Grid.Row="1"/>
+        <Label Name="FileNameLabel" Content="File Name" HorizontalAlignment="Left" Margin="85,158,0,0" VerticalAlignment="Top" Grid.Row="1"/>
         <MediaElement Name="audioMediaElement" MediaOpened="audioMediaElement_MediaOpened" MediaEnded="audioMediaElement_MediaEnded" 
-               MediaFailed="audioMediaElement_MediaFailed" LoadedBehavior="Manual"/>
+               MediaFailed="audioMediaElement_MediaFailed" LoadedBehavior="Manual" Margin="0,0,0,103"/>
         <Slider Name="timelineSlider" Margin="146,184,154,91" Grid.Row="1"/>
 
         <Button Content="Play" HorizontalAlignment="Left" Margin="146,211,0,0" VerticalAlignment="Top" Width="75" Click="Play_Click" Grid.Row="1"/>

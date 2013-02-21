@@ -24,10 +24,13 @@ namespace Recording_GUI_2
 
     public partial class MainWindow : Window
     {
-        Timer timer = new Timer();
+        private string file;
         private string filename;
+        //For just playing the audio
         private MediaPlayer mplayer = new MediaPlayer();
-        private DispatcherTimer _timer;
+        //For recording the audio
+        private DispatcherTimer timer = new DispatcherTimer();
+        //private Timer timer = new Timer();
         private string mousePositionFileString;
 
         public MainWindow()
@@ -52,32 +55,51 @@ namespace Recording_GUI_2
                     StopTimer();
                     timelineSlider.Value = 0.0;
                 }
-
+        
                 private void SetupTimer()
                 {
                     _timer = new DispatcherTimer();
                     _timer.Interval = TimeSpan.FromSeconds(timelineSlider.StepFrequency);
-                    StartTimer();
                 }
         */
-                private void _timer_Tick(object sender, object e)
+                private void timer_Tick(object sender, object e)
                 {
+                    //Only record if the left mouse button is pressed
+                    if (Mouse.LeftButton != MouseButtonState.Pressed)
+                    {
+                        return;
+                    }
+
                     //Record the mouse position over time
-                    string mousePosition = Mouse.GetPosition(Application.Current.MainWindow).ToString();
+                    //Point position = Mouse.GetPosition()
+
+                    //string mousePosition = Mouse.GetPosition(Application.Current.MainWindow).ToString();
+                    string mousePosition = Mouse.GetPosition(this.recordingRectangle).ToString();
+  
                     //MessageBoxResult result = MessageBox.Show(mousePosition);
-                    mousePositionFileString += mousePosition;
+                    if (mousePositionFileString != "")
+                    {
+                        mousePositionFileString += ";\n " + mousePosition;
+                    }
+                    else
+                    {
+                        mousePositionFileString += mousePosition;
+                    }
+
                 }
         
                 private void StartTimer()
                 {
-                    _timer.Tick += _timer_Tick;
-                    _timer.Start();
+                    timer.Tick += new EventHandler(timer_Tick);
+                    //100 millisecond interval (10 a second)
+                    timer.Interval = new TimeSpan(0, 0, 0, 0, 100);
+                    timer.Start();
                 }
 
                 private void StopTimer()
                 {
-                    _timer.Stop();
-                    _timer.Tick -= _timer_Tick;
+                    timer.Stop();
+                    //timer.Tick -= timer_Tick;
                 }
         /*
                 private double SliderFrequency(TimeSpan timevalue)
@@ -129,14 +151,19 @@ namespace Recording_GUI_2
             //Reset the slider to 0
             timelineSlider.Value = 0.0;
 
+            //MessageBoxResult results = MessageBox.Show(mousePositionFileString.ToString());
+
             //Write the mouse position data to the file
-            string mydocpath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            using (StreamWriter outfile = new StreamWriter(mydocpath + @"\AllTxtFiles.txt"))
+            string mydocpath = "C:\\Users\\Ryan\\Documents\\GitHub\\PlanarAudioPixel\\PlanarAudioPixel\\Recording GUI 2\\bin";
+            //MessageBoxResult resultss = MessageBox.Show(mydocpath);
+            string filenameNoExt = System.IO.Path.GetFileNameWithoutExtension(filename);
+            string fullPath = mydocpath + @"\" + filenameNoExt + "_path.txt";
+            using (StreamWriter outfile = new StreamWriter(fullPath))
             {
                 outfile.Write(mousePositionFileString.ToString());
             }
 
-            //MessageBoxResult results = MessageBox.Show("Audio finished playing");
+            MessageBoxResult results = MessageBox.Show("Finished recording audio path.\n File: " + fullPath);
         }
 
         //Called when there is an error opening the file
@@ -149,13 +176,13 @@ namespace Recording_GUI_2
         private void Play_Click(Object sender, EventArgs e)
         {
             //Check to make sure that a file was selected
-            if (filename == null)
+            if (file == null)
             {
                 return;
             }
             //Play the audio back to the user
             //This player JUST plays the audio, nothing else
-            mplayer.Open(new Uri(filename, UriKind.Relative));
+            mplayer.Open(new Uri(file, UriKind.Relative));
             mplayer.Play();
 
             /*
@@ -179,14 +206,21 @@ namespace Recording_GUI_2
         private void Record_Click(Object sender, EventArgs e)
         {
             //Check to make sure a file was selected
-            if (filename == null)
+            if (file == null)
             {
                 MessageBoxResult results = MessageBox.Show("Error: You must select a file first");
                 return;
             }
 
+            MessageBoxResult result = MessageBox.Show(this, "Are you sure you want to overwrite the previously recorded path?",
+ "Confirmation", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+            if (result == MessageBoxResult.Cancel)
+            {
+                return;
+            }
+
             //Play the audio when the user is drawing a path
-            audioMediaElement.Source = new Uri(filename, UriKind.Relative);
+            audioMediaElement.Source = new Uri(file, UriKind.Relative);
             audioMediaElement.Play();
 
             //Record the user's mouse movement for the audio path
@@ -204,16 +238,17 @@ namespace Recording_GUI_2
         //Reset button
         private void Reset_Click(Object sender, EventArgs e)
         {
-            audioMediaElement.Stop();
+            audioMediaElement.Pause();
+
             MessageBoxResult result = MessageBox.Show(this, "If you close this window, all data will be lost.",
              "Confirmation", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-            if (result == MessageBoxResult.OK)
+            if (result == MessageBoxResult.Cancel)
             {
-                // Yes code here
+                audioMediaElement.Play();
             }
             else
             {
-                // No code here
+                audioMediaElement.Stop();
             }
 
         }
@@ -226,20 +261,20 @@ namespace Recording_GUI_2
             Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
 
             // Set filter for file extension and default file extension
-            dlg.DefaultExt = ".mp3";
+            dlg.DefaultExt = ".wav";
             dlg.Filter = "Audio Files (.wav)|*.wav";
 
             // Display OpenFileDialog by calling ShowDialog method
             Nullable<bool> result = dlg.ShowDialog();
 
-            // Get the selected file name and display in a TextBox
+            // Get the selected file and display in TextBox
             if (result == true)
             {
                 // Open document
-                filename = dlg.FileName;
-                FileNameTextBox.Text = filename;
-                string file = System.IO.Path.GetFileName(filename);
-                FileNameLabel.Content = file;
+                file = dlg.FileName;
+                FileNameTextBox.Text = file;
+                filename = System.IO.Path.GetFileName(file);
+                FileNameLabel.Content = filename;
             }
         }
     }
