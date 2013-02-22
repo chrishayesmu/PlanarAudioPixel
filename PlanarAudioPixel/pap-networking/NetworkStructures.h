@@ -62,11 +62,16 @@ namespace Networking
 		bool operator < (const ClientGUID& ID) const;
 	};
 
+	/// <summary>Formats a ClientGUID object into a string. The string will be "x.x.x.x x.x.x.x", where the first
+	/// quartet is the broadcast IP and the second quartet is the local IP.</summary>
+	/// <param name='str'>A string to fill with the ClientGUID. Should contain room for at least 32 bytes.</param>
+	/// <param name='guid'>The ClientGUID to use when filling the string.</param>
+	void formatGUIDAsString(char* str, Networking::ClientGUID guid);
+
 	// A structure for representing a client's position and networking information.
 	// Defined in section 3.1 of the PAP document.
 	struct Client
 	{
-
 		// A union combining the BroadcastIP and LocalIP as a ClientGUID.
 		union {
 			struct {

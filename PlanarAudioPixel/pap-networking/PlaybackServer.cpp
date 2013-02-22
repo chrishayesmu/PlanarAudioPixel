@@ -34,6 +34,11 @@ namespace Networking {
 			PacketStructures::NetworkMessage connectionAcknowledgement;
 			connectionAcknowledgement.ControlByte = ControlBytes::NEW_CONNECTION;
 			this->sendSocket->SendMessage((char*)&connectionAcknowledgement, sizeof(PacketStructures::NetworkMessage));
+
+			Logger::logNotice("Client connected (GUID: %c-%c-%c-%c %c-%c-%c-%c)", client.BroadcastIP.Byte1, client.BroadcastIP.Byte2,
+																				  client.BroadcastIP.Byte3, client.BroadcastIP.Byte4,
+																				  client.LocalIP.Byte1,     client.LocalIP.Byte2,
+																				  client.LocalIP.Byte3,     client.LocalIP.Byte4);
 		}
 
 		///<summary>Updates the client information table for the client that sent the check in.</summary>
@@ -53,12 +58,24 @@ namespace Networking {
 				this->clientCheckInCallbacks[i](Networking::ClientInformationTable[message->ClientConnection.clientID]);
 			}
 
+			ClientGUID clientID = message->ClientConnection.clientID;
+
+			char clientIDasString[32];
+			formatGUIDAsString(clientIDasString, clientID);
+			Logger::logNotice("Client checked in (GUID: %s)", clientIDasString);
+
 			//Check if the client's position changed
-			if (message->ClientCheckIn.position.x != Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.x
-			 || message->ClientCheckIn.position.y != Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.y)
+			float oldX = Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.x;
+			float oldY = Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.y;
+			float newX = message->ClientCheckIn.position.x;
+			float newY = message->ClientCheckIn.position.y;
+
+			if (newX != oldX || newY != oldY)
 			{
-				Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.x = message->ClientCheckIn.position.x;
-				Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.y = message->ClientCheckIn.position.y;
+				Logger::logWarning("Client (GUID: %s) moved from (%f, %f) to (%f, %f)", clientIDasString, oldX, oldY, newX, newY);
+
+				Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.x = newX;
+				Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.y = newY;
 				this->clientPositionsChanged();
 			}
 		}
@@ -68,6 +85,8 @@ namespace Networking {
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::resendAudio(const PacketStructures::NetworkMessage* message, int dataSize) {
 
+			Logger::logWarning("Received an audio resend request");
+
 			//Drop resend requests that appear within a timeout's worth of microseconds of each other
 			ResendRequestIterator c = this->sampleResendRequests.find(message->AudioResendRequest.TrackID);
 			if (c != this->sampleResendRequests.end())
@@ -75,6 +94,8 @@ namespace Networking {
 				if (c->second.find(message->AudioResendRequest.SampleID) != c->second.end() &&
 					getMicroseconds() - c->second[message->AudioResendRequest.SampleID] < Networking::ClientReceivedPacketTimeout) 
 				{
+					Logger::logWarning("Received audio resend requests too close together (client GUID unknown)");
+
 					return;
 				}
 			}
@@ -342,7 +363,7 @@ namespace Networking {
 			this->playbackState = PlaybackStates::Playback_STOPPED;
 
 			Logger::openLogFile();
-			Logger::logNotice("Server started up");
+			Logger::logNotice("Starting playback server");
 
 			do {
 				//Wait for a control message resource
@@ -980,6 +1001,7 @@ namespace Networking {
 			}
 
 			//Set the sendSocket up for UDP broadcasting
+			// TODO make this shit broadcast somewhere useful
 			server->sendSocket->PrepareUDPSend(NetworkPort, "127.0.0.1");
 
 			//Attempt to create the recvSocket inside the Server
