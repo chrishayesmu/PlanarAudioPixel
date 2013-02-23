@@ -206,6 +206,66 @@ namespace Networking {
 			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}
 
+		///<summary>Calculates the volume for a track, for all sample IDs between sampleStart and
+		/// sampleEnd, inclusive. The volume is stored in this->tracks.</summary>
+		///<param name='sampleStart'>The sample ID to begin calculating volume at.</param>
+		///<param name='sampleEnd'>The sample ID to be the last volume calculation.</param>
+		void PlaybackServer::calculateVolumeData(trackid_t trackID, sampleid_t sampleStart, sampleid_t sampleEnd)
+		{
+			// Local variables because I'm lazy
+			TrackInfo track = this->tracks[trackID];
+			PositionBuffer positions = track.positionData;
+
+			// Naive algorithm: scale everything so that the nearest client plays at full volume,
+			// then scale down from there. No regard given to units or any anomalous situations that may arise.
+			// This algorithm will be modified and refined as testing shows how well it works.
+			for (sampleid_t i = sampleStart; i <= sampleEnd; i++)
+			{
+				PositionInfo pos = positions[i];
+				ClientGUID closestClient = ClientInformationTable.begin()->first;
+				ClientGUID furthestClient = closestClient;
+
+				// Map between ClientGUIDs and their distance from the audio source
+				std::map<ClientGUID, float> clientDistMap;
+
+				// Record each client's distance from the source
+				for (ClientIterator clientIt = ClientInformationTable.begin(); clientIt != ClientInformationTable.end(); clientIt++)
+				{
+					Client client = clientIt->second;
+					float dist = sqrt((pos.x - client.Offset.x) * (pos.x - client.Offset.x) + (pos.y - client.Offset.y) * (pos.y - client.Offset.y));
+
+					clientDistMap[clientIt->first] = dist;
+
+					if (dist < clientDistMap[closestClient])
+					{
+						closestClient = clientIt->first;
+					}
+
+					if (dist > clientDistMap[furthestClient])
+					{
+						furthestClient = clientIt->first;
+					}
+				}
+
+				// Min and max found; record those now before the next loop can modify them
+				float minDist = clientDistMap[closestClient];
+				float maxDist = clientDistMap[furthestClient];
+
+				// Now go back through and scale each distance to fit in the range [0, 1];
+				// apply clipping to any volumes falling below a threshold
+				for (ClientIterator clientIt = ClientInformationTable.begin(); clientIt != ClientInformationTable.end(); clientIt++)
+				{
+					clientDistMap[clientIt->first] = (clientDistMap[clientIt->first] - minDist) / (maxDist - minDist);
+
+					if (clientDistMap[clientIt->first] < MIN_VOLUME_THRESHOLD)
+						clientDistMap[clientIt->first] = 0.0f;
+
+					// Store volume data in global data
+					track.volumeData[sampleStart][clientIt->first] = clientDistMap[clientIt->first];
+				}
+			}
+		}
+
 		///<summary>Broadcasts an audio sample to the client network.</summary>
 		///<param name="trackID">The ID of the track that this AudioSample belongs to.</param>
 		///<param name="sampleBuffer">The sample data.</param>
@@ -237,7 +297,6 @@ namespace Networking {
 
 			//Send the data
 			this->sendSocket->SendMessage((char*)&audioSampleMessage, sizeof(PacketStructures::NetworkMessage) + sampleBuffer.Data.DataLength);
-
 		}
 
 		///<summary>Broadcasts volume information for the client network.</summary>
@@ -252,6 +311,7 @@ namespace Networking {
 			Logger::logNotice("Sending volume sample; trackID: %d; sampleID: %d", trackID, sampleID);
 
 			//Define a struct capable of containing both the network message and 121 clients of volume data.
+			// TODO what happens if there's more than 121 clients worth of data? We need to send multiple messages
 			struct {
 				PacketStructures::NetworkMessage networkHeader;
 				PacketStructures::ClientVolume volumeData[121];
@@ -296,12 +356,11 @@ namespace Networking {
 			char idAsString[32];
 			formatGUIDAsString(idAsString, clientID);
 
-			Logger::logNotice("Sending disconnect message to client %s", idAsString);
+			Logger::logNotice("Sending disconnect message to client (GUID: %s)", idAsString);
 
 			PacketStructures::NetworkMessage disconnectMessage;
 			disconnectMessage.DisconnectNotification.clientID = clientID;
 			this->sendSocket->SendMessage((char*)&disconnectMessage, sizeof(PacketStructures::NetworkMessage));
-
 		}
 
 		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>

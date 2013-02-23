@@ -181,6 +181,12 @@ namespace Networking {
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
 		int readPositionDataFromFile(char* filename, PositionBuffer& buffer);
 
+		///<summary>Calculates the volume for a track, for all sample IDs between sampleStart and
+		/// sampleEnd, inclusive. The volume is stored in this->tracks.</summary>
+		///<param name='sampleStart'>The sample ID to begin calculating volume at.</param>
+		///<param name='sampleEnd'>The sample ID to be the last volume calculation.</param>
+		void calculateVolumeData(trackid_t trackID, sampleid_t sampleStart, sampleid_t sampleEnd);
+
 		//## Possibly add an RTT field to the Client structure and periodically send RTT tracking requests. Then use it 
 		//## to send an accurate expected wait time to a Client for receiving all samples in a buffer range.
 		///<summary>Broadcasts an audio sample to the client network.</summary>
@@ -213,6 +219,7 @@ namespace Networking {
 
 		///<summary>Handles server management and control messages.</summary>
 		void serverMain();
+
 		///<summary>Multithreaded router function that calls serverMain().</summary>
 		static DWORD __stdcall serverRouteMain(void* server);
 
