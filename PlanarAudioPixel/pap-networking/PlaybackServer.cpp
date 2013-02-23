@@ -95,7 +95,6 @@ namespace Networking {
 					getMicroseconds() - c->second[message->AudioResendRequest.SampleID] < Networking::ClientReceivedPacketTimeout) 
 				{
 					Logger::logWarning("Received audio resend requests too close together (client GUID unknown)");
-
 					return;
 				}
 			}
@@ -116,6 +115,8 @@ namespace Networking {
 		///<param name="dataSize">The number of bytes in the datagram.</param>
 		void PlaybackServer::resendVolume(const PacketStructures::NetworkMessage* message, int dataSize){
 			
+			Logger::logWarning("Received a volume resend request");
+
 			//Drop resend requests that appear within a timeout's worth of microseconds of each other
 			ResendRequestIterator c = this->volumeResendRequests.find(message->VolumeResendRequest.TrackID);
 			if (c != this->volumeResendRequests.end())
@@ -123,6 +124,7 @@ namespace Networking {
 				if (c->second.find(message->VolumeResendRequest.SampleID) != c->second.end() &&
 					getMicroseconds() - c->second[message->VolumeResendRequest.SampleID] < Networking::ClientReceivedPacketTimeout) 
 				{
+					Logger::logWarning("Received volume resend requests too close together (client GUID unknown)");
 					return;
 				}
 			}
@@ -141,7 +143,7 @@ namespace Networking {
 		///<summary>This function will be called in order to notify the server that one or more clients have moved, 
 		/// joined, or dropped out, and that the volume must therefore be recalculated and resent.</summary>
 		void PlaybackServer::clientPositionsChanged() {
-
+			Logger::logNotice("Client positions have changed");
 		}
 				
 		///<summary>Reads audio data from the file and fills an AudioBuffer.</summary>
@@ -151,9 +153,15 @@ namespace Networking {
 		int PlaybackServer::readAudioDataFromFile(char* filename, AudioBuffer& buffer){
 			if (!filename) return PlaybackServerErrorCodes::PlaybackServer_POINTER;
 
+			Logger::logNotice("Attempting to read audio data from file %s ..", filename);
+
 			//Attempt to open the file
 			FILE* audioFile = fopen(filename, "rb");
-			if (!audioFile) return PlaybackServerErrorCodes::PlaybackServer_FILE;
+			if (!audioFile) 
+			{
+				Logger::logWarning("Failed to open audio file %s", filename);
+				return PlaybackServerErrorCodes::PlaybackServer_FILE;
+			}
 
 			//File reading buffer
 			char readBuffer[4096];
@@ -164,6 +172,7 @@ namespace Networking {
 
 			// TODO - actually read from file
 
+			Logger::logNotice("Successfully read audio file %s", filename);
 			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}
 
@@ -174,9 +183,15 @@ namespace Networking {
 		int PlaybackServer::readPositionDataFromFile(char* filename, PositionBuffer& buffer){
 			if (!filename) return PlaybackServerErrorCodes::PlaybackServer_POINTER;
 
+			Logger::logNotice("Attempting to read volume data from file %s ..", filename);
+
 			//Attempt to open the file
 			FILE* audioFile = fopen(filename, "rb");
-			if (!audioFile) return PlaybackServerErrorCodes::PlaybackServer_FILE;
+			if (!audioFile) 
+			{
+				Logger::logWarning("Failed to open volume file %s", filename);
+				return PlaybackServerErrorCodes::PlaybackServer_FILE;
+			}
 
 			//File reading buffer
 			char readBuffer[4096];
@@ -187,6 +202,7 @@ namespace Networking {
 
 			// TODO - actually read from file
 			
+			Logger::logNotice("Successfully read volume file %s", filename);
 			return PlaybackServerErrorCodes::PlaybackServer_OK;
 		}
 
@@ -197,6 +213,9 @@ namespace Networking {
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffer range currently being delivered.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
 		void PlaybackServer::sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID){
+
+			// TODO - log buffer start/end? Not clear on what these things are
+			Logger::logNotice("Sending audio sample; trackID: %d; sampleID: %d", trackID, sampleBuffer.SampleID);
 
 			//Define a struct capable of containing both the network message and the buffer data.
 			struct {
@@ -229,6 +248,9 @@ namespace Networking {
 		///<returns>Integer return code specifying the result of the call.</returns>
 		void PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
 						
+			// TODO - log buffer start/end? Not clear on what these things are
+			Logger::logNotice("Sending volume sample; trackID: %d; sampleID: %d", trackID, sampleID);
+
 			//Define a struct capable of containing both the network message and 121 clients of volume data.
 			struct {
 				PacketStructures::NetworkMessage networkHeader;
@@ -270,6 +292,11 @@ namespace Networking {
 		///<summary>Sends a disconnect packet to a particular client.</summary>
 		///<param name="clientID">The ID of the client to which this message applies</param>
 		void PlaybackServer::sendDisconnect(ClientGUID clientID) {
+
+			char idAsString[32];
+			formatGUIDAsString(idAsString, clientID);
+
+			Logger::logNotice("Sending disconnect message to client %s", idAsString);
 
 			PacketStructures::NetworkMessage disconnectMessage;
 			disconnectMessage.DisconnectNotification.clientID = clientID;
@@ -400,7 +427,7 @@ namespace Networking {
 
 				switch (request.controlCode){
 
-					//Process timer tick events
+				//Process timer tick events
 				case PlaybackServerRequestCodes::PlaybackServer_TIMER_TICK:
 
 					if (this->playbackState == PlaybackStates::Playback_PLAYING) {
@@ -422,9 +449,13 @@ namespace Networking {
 
 					//Check to see if any clients have timed out
 					cTime = getMicroseconds();
+
 					for (ClientIterator i = Networking::ClientInformationTable.begin(); i != Networking::ClientInformationTable.end(); ++i) {
 						//If the time between check-ins exceeds CLIENT_CHECKIN_DELAY milliseconds, drop the client
 						if ((cTime - i->second.LastCheckInTime) / 1000 > CLIENT_CHECKIN_DELAY) {
+
+							Logger::logWarning("A client has timed out and been disconnected; GUID: %s", i->second.ClientID);
+
 							this->sendDisconnect(i->second.ClientID);
 							clientDropList.push_back(i->second.ClientID);
 
@@ -437,6 +468,7 @@ namespace Networking {
 					}
 					if (clientDropList.size()) {
 						EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+
 						for (int i = 0; i < clientDropList.size(); ++i) {
 							//Take the client out of the information table, and free up any current requests that may be waiting on it
 							Networking::ClientInformationTable.erase(clientDropList[i]);
@@ -445,6 +477,7 @@ namespace Networking {
 								this->requestsAcknowledged[this->currentRequestID].erase(j->first);
 							}
 						}
+
 						LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 					}
 
@@ -468,6 +501,7 @@ namespace Networking {
 												i, this->tracks[bufferTrackID].volumeData[i],
 												beginBufferRange, endBufferRange);
 					}
+
 					Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 					//Repost the buffering request until all packets have been buffered.
@@ -603,15 +637,16 @@ namespace Networking {
 							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 							resend = false;
-							
-					EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+							EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+
 							//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
 							for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
 								if (j->second) {
 									resend = true;
 									break;
 								}
-					LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
+
+							LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 						}
 					
 						this->playbackState = PlaybackState::Playback_PLAYING;
@@ -644,14 +679,16 @@ namespace Networking {
 							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 							resend = false;
-					EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+							EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+
 							//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
 							for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
 								if (j->second) {
 									resend = true;
 									break;
 								}
-					LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
+
+							LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 						}
 					
 						this->playbackState = PlaybackState::Playback_PLAYING;
@@ -688,14 +725,16 @@ namespace Networking {
 						Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 						resend = false;
-					EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+						EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+
 						//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
 						for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
 							if (j->second) {
 								resend = true;
 								break;
 							}
-					LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
+						
+						LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 
 					} while (resend);
 
@@ -726,15 +765,16 @@ namespace Networking {
 						Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 						resend = false;
-					EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+						EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
+
 						//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
 						for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
 							if (j->second) {
 								resend = true;
 								break;
 							}
-					LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 
+						LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 					} while (resend);
 
 					this->playbackState = PlaybackStates::Playback_STOPPED;
@@ -762,8 +802,8 @@ namespace Networking {
 				}
 
 			} while (this->state != PlaybackServerStates::PlaybackServer_STOPPED);
-
 		}
+
 		///<summary>Multithreaded router function that calls serverMain().</summary>
 		DWORD PlaybackServer::serverRouteMain(void* server){
 			static_cast<PlaybackServer*>(server)->serverMain();
@@ -788,8 +828,8 @@ namespace Networking {
 
 			//Timer has ended.
 			LeaveCriticalSection(&this->timerDestroyedCriticalSection);
-
 		}
+
 		///<summary>Multithreaded router function that calls timerTickEvent().</summary>
 		DWORD PlaybackServer::timerRoute(void* server) {
 			static_cast<PlaybackServer*>(server)->timerTickEvent();
@@ -952,6 +992,9 @@ namespace Networking {
 		///<summary>Attempts to start playback.</summary>
 		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
 		PlaybackServerErrorCode PlaybackServer::Play(){
+
+			Logger::logNotice("Attempting to set playback to 'PLAY'..");
+
 			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
 				return PlaybackServerErrorCodes::PlaybackServer_ISINVALID;
 
@@ -963,6 +1006,9 @@ namespace Networking {
 		///<summary>Attempts to pause playback.</summary>
 		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
 		PlaybackServerErrorCode PlaybackServer::Pause() {
+			
+			Logger::logNotice("Attempting to set playback to 'PAUSE'..");
+			
 			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
 				return PlaybackServerErrorCodes::PlaybackServer_ISINVALID;
 
@@ -974,6 +1020,9 @@ namespace Networking {
 		///<summary>Attempts to stop playback.</summary>
 		///<returns>A PlaybackErrorCode indicating the result of this call.</returns>
 		PlaybackServerErrorCode PlaybackServer::Stop() {
+			
+			Logger::logNotice("Attempting to set playback to 'STOP'..");
+
 			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
 				return PlaybackServerErrorCodes::PlaybackServer_ISINVALID;
 
@@ -1037,6 +1086,9 @@ namespace Networking {
 		///<param name="token">An identifying token that is passed along with the callback when the corresponding request complete.</param>
 		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
 		PlaybackServerErrorCode PlaybackServer::AddTrack(char* audioFilename, char* positionFilename, AddTrackCallback callback, uint64_t token){
+			
+			Logger::logNotice("Attempting to add new track:=; audio file %s; position file %s", audioFilename, positionFilename);
+			
 			if (this->state != PlaybackServerStates::PlaybackServer_RUNNING) 
 				return PlaybackServerErrorCodes::PlaybackServer_ISINVALID;
 
