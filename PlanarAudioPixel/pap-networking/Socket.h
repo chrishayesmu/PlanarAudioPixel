@@ -1,7 +1,21 @@
 #pragma once
 
+#ifndef RASPBERRY_PI
 #include <winsock2.h>
 #include <WS2tcpip.h>
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <time.h>
+
+typedef int SOCKET;
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR   -1
+#define LPCTSTR const char*
+ 
+#endif
+
 #include <stdio.h>
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -42,13 +56,21 @@ namespace Networking {
 		//The Internet Protocol version 4 (IPv4) address family.
 		IPv4 = AF_INET,
 		//The NetBIOS address family. This address family is only supported if a Windows Sockets provider for NetBIOS is installed.
+		#ifndef RASPBERRY_PI
 		NetBIOS = AF_NETBIOS,
+		#else
+		NetBIOS = AF_INET6,
+		#endif
 		//The Internet Protocol version 6 (IPv6) address family.
 		IPv6 = AF_INET6,
 		//The Infrared Data Association (IrDA) address family. This address family is only supported if the computer has an infrared port and driver installed.
 		InfraredDataAssociation = AF_IRDA,
 		//The Bluetooth address family. This address family is only supported if a Bluetooth adapter is installed on Windows Server 2003 or later.
+		#ifndef RASPBERRY_PI
 		Bluetooth = AF_BTH
+		#else
+		Bluetooth = 32
+		#endif
 	};
 
 	#ifdef UNICODE
@@ -84,8 +106,10 @@ namespace Networking {
 
 	public:
 
+		#ifndef RASPBERRY_PI
 		// Winsock data
 		WSADATA wsaData;
+		#endif
 
 		// Internal socket type (TCP, UDP, etc..)
 		SocketType socketType;

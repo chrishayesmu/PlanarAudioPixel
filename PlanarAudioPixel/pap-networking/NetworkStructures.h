@@ -11,6 +11,7 @@
 #include "../pap-file-io/IOStructures.h"
 #include "ControlByteConstants.h"
 #include <stdint.h>
+#include <time.h>
 
 namespace Networking
 {
@@ -56,7 +57,11 @@ namespace Networking
 				IP_Address BroadcastIP;
 				IP_Address LocalIP;
 			};
+			#ifndef RASPBERRY_PI
 			unsigned __int64 ID;
+			#else
+			uint64_t ID;
+			#endif
 		};
 
 		bool operator < (const ClientGUID& ID) const;
@@ -248,7 +253,11 @@ namespace Networking
 					//Client to Server - Acknowledgement
 					struct {
 						/* [8] */ ClientGUID clientID;
+						#ifndef RASPBERRY_PI
 						/* [8] */ requestid_t requestID;
+						#else
+						/* [8] */ requestid_t clientRequestID;
+						#endif
 					};
 				} TransportControl;
 
