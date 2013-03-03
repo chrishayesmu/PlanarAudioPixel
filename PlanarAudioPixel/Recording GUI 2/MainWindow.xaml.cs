@@ -15,6 +15,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.IO;
 using System.Timers;
+using System.Drawing;
 
 namespace Recording_GUI_2
 {
@@ -28,10 +29,11 @@ namespace Recording_GUI_2
         private string filename;
         //For just playing the audio
         private MediaPlayer mplayer = new MediaPlayer();
-        //For recording the audio
+        //For recording the audio path
         private DispatcherTimer timer = new DispatcherTimer();
         //private Timer timer = new Timer();
         private string mousePositionFileString;
+        private Boolean leftMouseDown;
 
         public MainWindow()
         {
@@ -69,21 +71,22 @@ namespace Recording_GUI_2
                     {
                         return;
                     }
-
-                    //Record the mouse position over time
-                    //Point position = Mouse.GetPosition()
+                    
+                    //Draw the mouse position over time
+                    Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
+                    //drawMousePath(mousePosition.X, mousePosition.Y);
 
                     //string mousePosition = Mouse.GetPosition(Application.Current.MainWindow).ToString();
-                    string mousePosition = Mouse.GetPosition(this.recordingRectangle).ToString();
-  
+                    string mousePositionString = mousePosition.ToString();
+                    
                     //MessageBoxResult result = MessageBox.Show(mousePosition);
                     if (mousePositionFileString != "")
                     {
-                        mousePositionFileString += ";\n " + mousePosition;
+                        mousePositionFileString += ";\n " + mousePositionString;
                     }
                     else
                     {
-                        mousePositionFileString += mousePosition;
+                        mousePositionFileString += mousePositionString;
                     }
 
                 }
@@ -92,14 +95,13 @@ namespace Recording_GUI_2
                 {
                     timer.Tick += new EventHandler(timer_Tick);
                     //100 millisecond interval (10 a second)
-                    timer.Interval = new TimeSpan(0, 0, 0, 0, 100);
+                    timer.Interval = new TimeSpan(0, 0, 0, 0, 50);
                     timer.Start();
                 }
 
                 private void StopTimer()
                 {
                     timer.Stop();
-                    //timer.Tick -= timer_Tick;
                 }
         /*
                 private double SliderFrequency(TimeSpan timevalue)
@@ -134,14 +136,6 @@ namespace Recording_GUI_2
                     return stepfrequency;
                 }
                 */
-        //Called when audio is playing
-        //Record mouse movements here
-        void audioMediaElement_MediaOpened(object sender, RoutedEventArgs e)
-        {
-            mousePositionFileString = "";
-            //MessageBoxResult results = MessageBox.Show("Audio is playing");
-            StartTimer();
-        }
 
         //Called when the audio has finished playing
         //Save the mouse movements to a file here
@@ -151,16 +145,21 @@ namespace Recording_GUI_2
             //Reset the slider to 0
             timelineSlider.Value = 0.0;
 
-            //MessageBoxResult results = MessageBox.Show(mousePositionFileString.ToString());
-
             //Write the mouse position data to the file
             string mydocpath = "C:\\Users\\Ryan\\Documents\\GitHub\\PlanarAudioPixel\\PlanarAudioPixel\\Recording GUI 2\\bin";
             //MessageBoxResult resultss = MessageBox.Show(mydocpath);
             string filenameNoExt = System.IO.Path.GetFileNameWithoutExtension(filename);
             string fullPath = mydocpath + @"\" + filenameNoExt + "_path.txt";
-            using (StreamWriter outfile = new StreamWriter(fullPath))
+            using (StreamWriter outfile = new StreamWriter(fullPath, false))
             {
-                outfile.Write(mousePositionFileString.ToString());
+                if (mousePositionFileString != null)
+                {
+                    outfile.Write(mousePositionFileString.ToString());
+                }
+                else
+                {
+                    outfile.Write("");
+                }
             }
 
             MessageBoxResult results = MessageBox.Show("Finished recording audio path.\n File: " + fullPath);
@@ -185,11 +184,6 @@ namespace Recording_GUI_2
             mplayer.Open(new Uri(file, UriKind.Relative));
             mplayer.Play();
 
-            /*
-            audioMediaElement.Source = new Uri(filename,  UriKind.Relative);
-            audioMediaElement.Play();
-            */
-
             //In time with the audio, show the drawn audio path
 
             //Start the slider
@@ -213,14 +207,33 @@ namespace Recording_GUI_2
             }
 
             MessageBoxResult result = MessageBox.Show(this, "Are you sure you want to overwrite the previously recorded path?",
- "Confirmation", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                                                        "Confirmation", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
             if (result == MessageBoxResult.Cancel)
             {
                 return;
             }
+            
+            //Clear the canvas
+            recordingCanvas.Children.Clear();
+            
+            //Re-add the rectangle
+            Rectangle rectangle = new Rectangle();
+            rectangle.Width = 414;
+            rectangle.Height = 241;
+            rectangle.Stroke = new SolidColorBrush(Colors.Black);
+            rectangle.StrokeThickness = 1;
+            rectangle.Fill = new SolidColorBrush(Colors.Gray);
+            // Set Canvas position
+            Canvas.SetLeft(rectangle, 90);
+            Canvas.SetTop(rectangle, 25);
+            // Add Rectangle to Canvas
+            recordingCanvas.Children.Add(rectangle);
 
             //Play the audio when the user is drawing a path
             audioMediaElement.Source = new Uri(file, UriKind.Relative);
+            mousePositionFileString = "";
+            //MessageBoxResult results = MessageBox.Show("Audio is playing");
+            StartTimer();
             audioMediaElement.Play();
 
             //Record the user's mouse movement for the audio path
@@ -256,7 +269,6 @@ namespace Recording_GUI_2
         //File Browse Button
         private void FileBrowse_Click(Object sender, EventArgs e)
         {
-
             // Create OpenFileDialog
             Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
 
@@ -276,6 +288,71 @@ namespace Recording_GUI_2
                 filename = System.IO.Path.GetFileName(file);
                 FileNameLabel.Content = filename;
             }
+        }
+        
+        //Draws all the time from the rectangle
+        /*private void drawMousePath(Object sender, EventArgs e)
+        {
+            Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
+            double X = mousePosition.X;
+            double Y = mousePosition.Y;
+
+            Line myLine = new Line();
+            myLine.Stroke = System.Windows.Media.Brushes.LightSteelBlue;
+            myLine.X1 = X;
+            myLine.X2 = X + 1;
+            myLine.Y1 = Y;
+            myLine.Y2 = Y + 1;
+            //myLine.HorizontalAlignment = HorizontalAlignment.Left;
+            //myLine.VerticalAlignment = VerticalAlignment.Center;
+            myLine.StrokeThickness = 5;
+            recordingCanvas.Children.Add(myLine);
+        }*/
+        
+        private void OnMouseDown(Object sender, EventArgs e) {
+            leftMouseDown = true;
+            //MessageBoxResult results = MessageBox.Show("In OnMouseDown");
+        }
+
+        private void OnMouseMove(Object sender, EventArgs e)
+        {
+            if(leftMouseDown == true)
+            {
+                drawMousePath();
+            }
+        }
+
+        private void OnMouseUp(Object sender, EventArgs e)
+        {
+            leftMouseDown = false;
+        }
+
+        //Draws on timer ticks in the canvas
+        private void drawMousePath()
+        {
+            //MessageBoxResult results = MessageBox.Show("In Draw Mouse");
+
+            Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
+            double X = mousePosition.X;
+            double Y = mousePosition.Y;
+
+            /*
+            Ellipse myEllipse = new Ellipse();
+            myEllipse.Stroke = System.Windows.Media.Brushes.LightSteelBlue;
+            myEllipse.Height = 1;
+            myEllipse.Width = 1;
+            myEllipse.
+*/
+            Line myLine = new Line();
+            myLine.Stroke = System.Windows.Media.Brushes.Black;
+            myLine.X1 = X;
+            myLine.X2 = X+1;
+            myLine.Y1 = Y;
+            myLine.Y2 = Y+1;
+            //myLine.HorizontalAlignment = HorizontalAlignment.Left;
+            //myLine.VerticalAlignment = VerticalAlignment.Center;
+            myLine.StrokeThickness = 5;
+            recordingCanvas.Children.Add(myLine);
         }
     }
 }

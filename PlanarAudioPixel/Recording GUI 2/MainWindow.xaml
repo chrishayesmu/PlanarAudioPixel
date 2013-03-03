@@ -8,10 +8,14 @@
             <RowDefinition Height="122*"/>
             <RowDefinition Height="297*"/>
         </Grid.RowDefinitions>
-        <Rectangle x:Name="recordingRectangle" Fill="#FFF4F4F5" Height="247" Margin="0,24,0,0" Stroke="Black" VerticalAlignment="Top" Width="419" Grid.RowSpan="2" HorizontalAlignment="Center"/>
-
-        <Label Name="FileNameLabel" Content="File Name" HorizontalAlignment="Left" Margin="85,158,0,0" VerticalAlignment="Top" Grid.Row="1"/>
-        <MediaElement Name="audioMediaElement" MediaOpened="audioMediaElement_MediaOpened" MediaEnded="audioMediaElement_MediaEnded" 
+        <!--<Rectangle x:Name="recordingRectangle" Fill="#FFF4F4F5" Height="247" Stroke="Black" VerticalAlignment="Top" Width="422" Grid.RowSpan="2" HorizontalAlignment="Center" Margin="85,24,88,0"/>-->
+        <Border x:Name="CanvasBorder" BorderBrush="Black" BorderThickness="3" HorizontalAlignment="Left" Height="247" Margin="85,24,0,0" VerticalAlignment="Top" Width="420" Grid.RowSpan="2">
+            <Canvas x:Name="recordingCanvas" MouseDown="OnMouseDown" MouseMove="OnMouseMove" MouseUp="OnMouseUp" HorizontalAlignment="Left" Height="247" Margin="-90,-25,0,0" VerticalAlignment="Top" Width="420" Grid.RowSpan="2">
+                <Rectangle Fill="Gray" Height="241" Stroke="Black" VerticalAlignment="Top" Width="414" Grid.RowSpan="2" HorizontalAlignment="Center" Canvas.Left="90" Canvas.Top="25"/>
+            </Canvas>
+        </Border>
+                <Label Name="FileNameLabel" Content="File Name" HorizontalAlignment="Left" Margin="85,158,0,0" VerticalAlignment="Top" Grid.Row="1"/>
+        <MediaElement Name="audioMediaElement" MediaEnded="audioMediaElement_MediaEnded" 
                MediaFailed="audioMediaElement_MediaFailed" LoadedBehavior="Manual" Margin="0,0,0,103"/>
         <Slider Name="timelineSlider" Margin="146,184,154,91" Grid.Row="1"/>
 
