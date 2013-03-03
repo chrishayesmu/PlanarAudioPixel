@@ -31,7 +31,6 @@ namespace Recording_GUI_2
         private MediaPlayer mplayer = new MediaPlayer();
         //For recording the audio path
         private DispatcherTimer timer = new DispatcherTimer();
-        //private Timer timer = new Timer();
         private string mousePositionFileString;
         private Boolean leftMouseDown;
 
@@ -48,90 +47,94 @@ namespace Recording_GUI_2
             };
         }
 
+        private void timer_Tick(object sender, object e)
+        {
+            audioMediaElementPosition.Content = audioMediaElement.Position;
+
+            //Only record if the left mouse button is pressed
+            if (Mouse.LeftButton != MouseButtonState.Pressed)
+            {
+                return;
+            }
+                    
+            //Draw the mouse position over time
+            Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
+            string mousePositionString = mousePosition.ToString();
+                    
+            //MessageBoxResult result = MessageBox.Show(mousePosition);
+            if (mousePositionFileString != "")
+            {
+                mousePositionFileString += ";\n " + mousePositionString;
+            }
+            else
+            {
+                mousePositionFileString += mousePositionString;
+            }
+        }
+        
+        private void StartTimer()
+        {
+            timelineSlider.Value = 0.0;
+            //timer.Interval = TimeSpan.FromSeconds(timelineSlider.TickFrequency);
+            timer.Tick += new EventHandler(timer_Tick);
+            //50 millisecond inte.rval
+            timer.Interval = new TimeSpan(0, 0, 0, 0, 50);
+            timer.Start();
+        }
+
+        private void StopTimer()
+        {
+            timer.Stop();
+        }
+        
         //Slider Controls
         /*
          *      http://msdn.microsoft.com/en-us/library/windows/apps/xaml/hh986967.aspx
          * 
-                void videoMediaElement_MediaEnded(object sender, RoutedEventArgs e)
-                {
-                    StopTimer();
-                    timelineSlider.Value = 0.0;
-                }
-        
-                private void SetupTimer()
-                {
-                    _timer = new DispatcherTimer();
-                    _timer.Interval = TimeSpan.FromSeconds(timelineSlider.StepFrequency);
-                }
         */
-                private void timer_Tick(object sender, object e)
-                {
-                    //Only record if the left mouse button is pressed
-                    if (Mouse.LeftButton != MouseButtonState.Pressed)
-                    {
-                        return;
-                    }
-                    
-                    //Draw the mouse position over time
-                    Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
-                    string mousePositionString = mousePosition.ToString();
-                    
-                    //MessageBoxResult result = MessageBox.Show(mousePosition);
-                    if (mousePositionFileString != "")
-                    {
-                        mousePositionFileString += ";\n " + mousePositionString;
-                    }
-                    else
-                    {
-                        mousePositionFileString += mousePositionString;
-                    }
-                }
-        
-                private void StartTimer()
-                {
-                    timer.Tick += new EventHandler(timer_Tick);
-                    //50 millisecond interval
-                    timer.Interval = new TimeSpan(0, 0, 0, 0, 50);
-                    timer.Start();
-                }
+        /*private double SliderFrequency(TimeSpan timevalue)
+        {
+            double stepfrequency = -1;
 
-                private void StopTimer()
-                {
-                    timer.Stop();
-                }
-        /*
-                private double SliderFrequency(TimeSpan timevalue)
-                {
-                    double stepfrequency = -1;
+            double absvalue = (int)Math.Round(
+                timevalue.TotalSeconds, MidpointRounding.AwayFromZero);
 
-                    double absvalue = (int)Math.Round(
-                        timevalue.TotalSeconds, MidpointRounding.AwayFromZero);
+            stepfrequency = (int)(Math.Round(absvalue / 100));
 
-                    stepfrequency = (int)(Math.Round(absvalue / 100));
+            if (timevalue.TotalMinutes >= 10 && timevalue.TotalMinutes < 30)
+            {
+                stepfrequency = 10;
+            }
+            else if (timevalue.TotalMinutes >= 30 && timevalue.TotalMinutes < 60)
+            {
+                stepfrequency = 30;
+            }
+            else if (timevalue.TotalHours >= 1)
+            {
+                stepfrequency = 60;
+            }
 
-                    if (timevalue.TotalMinutes >= 10 && timevalue.TotalMinutes < 30)
-                    {
-                        stepfrequency = 10;
-                    }
-                    else if (timevalue.TotalMinutes >= 30 && timevalue.TotalMinutes < 60)
-                    {
-                        stepfrequency = 30;
-                    }
-                    else if (timevalue.TotalHours >= 1)
-                    {
-                        stepfrequency = 60;
-                    }
+            if (stepfrequency == 0) stepfrequency += 1;
 
-                    if (stepfrequency == 0) stepfrequency += 1;
+            if (stepfrequency == 1)
+            {
+                stepfrequency = absvalue / 100;
+            }
 
-                    if (stepfrequency == 1)
-                    {
-                        stepfrequency = absvalue / 100;
-                    }
+            return stepfrequency;
+        }*/
 
-                    return stepfrequency;
-                }
-                */
+        public void audioMediaElement_MediaOpened(Object sender, RoutedEventArgs e) {
+            //MessageBoxResult results = MessageBox.Show(audioMediaElement.Position.ToString());
+            
+            //Start the slider
+            //double absvalue = (int)Math.Round(audioMediaElement.NaturalDuration.TimeSpan.TotalSeconds, MidpointRounding.AwayFromZero);
+
+            audioMediaElementLength.Content = audioMediaElement.NaturalDuration.TimeSpan;
+            
+            //timelineSlider.Maximum = absvalue;
+            //timelineSlider.TickFrequency = SliderFrequency(audioMediaElement.NaturalDuration.TimeSpan);
+        }
 
         //Called when the audio has finished playing
         //Save the mouse movements to a file here
@@ -182,14 +185,6 @@ namespace Recording_GUI_2
 
             //In time with the audio, show the drawn audio path
 
-            //Start the slider
-            /*double absvalue = (int)Math.Round(
-            mplayer.NaturalDuration.TimeSpan.TotalSeconds,
-            MidpointRounding.AwayFromZero);
-
-                timelineSlider.Maximum = absvalue;
-                timelineSlider.StepFrequency = SliderFrequency(videoMediaElement.NaturalDuration.TimeSpan);
-                SetupTimer();*/
         }
 
         //Record button
@@ -226,20 +221,9 @@ namespace Recording_GUI_2
             //Play the audio when the user is drawing a path
             audioMediaElement.Source = new Uri(file, UriKind.Relative);
             mousePositionFileString = "";
-            //MessageBoxResult results = MessageBox.Show("Audio is playing");
+  
             StartTimer();
             audioMediaElement.Play();
-
-            //Record the user's mouse movement for the audio path
-            //This is done in the audioMediaElement_MediaOpened function
-
-            //Start the slider
-            /*double absvalue = (int)Math.Round(
-            mplayer.NaturalDuration.TimeSpan.TotalSeconds, MidpointRounding.AwayFromZero);
-
-                        timelineSlider.Maximum = absvalue;
-                        timelineSlider.StepFrequency = SliderFrequency(videoMediaElement.NaturalDuration.TimeSpan);
-                        SetupTimer();*/
         }
 
         //Reset button
