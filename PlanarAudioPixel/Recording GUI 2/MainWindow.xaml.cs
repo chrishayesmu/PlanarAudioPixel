@@ -74,9 +74,6 @@ namespace Recording_GUI_2
                     
                     //Draw the mouse position over time
                     Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
-                    //drawMousePath(mousePosition.X, mousePosition.Y);
-
-                    //string mousePosition = Mouse.GetPosition(Application.Current.MainWindow).ToString();
                     string mousePositionString = mousePosition.ToString();
                     
                     //MessageBoxResult result = MessageBox.Show(mousePosition);
@@ -88,13 +85,12 @@ namespace Recording_GUI_2
                     {
                         mousePositionFileString += mousePositionString;
                     }
-
                 }
         
                 private void StartTimer()
                 {
                     timer.Tick += new EventHandler(timer_Tick);
-                    //100 millisecond interval (10 a second)
+                    //50 millisecond interval
                     timer.Interval = new TimeSpan(0, 0, 0, 0, 50);
                     timer.Start();
                 }
@@ -222,11 +218,9 @@ namespace Recording_GUI_2
             rectangle.Height = 241;
             rectangle.Stroke = new SolidColorBrush(Colors.Black);
             rectangle.StrokeThickness = 1;
-            rectangle.Fill = new SolidColorBrush(Colors.Gray);
-            // Set Canvas position
+            rectangle.Fill = new SolidColorBrush(Colors.LightGray);
             Canvas.SetLeft(rectangle, 90);
             Canvas.SetTop(rectangle, 25);
-            // Add Rectangle to Canvas
             recordingCanvas.Children.Add(rectangle);
 
             //Play the audio when the user is drawing a path
@@ -290,35 +284,18 @@ namespace Recording_GUI_2
             }
         }
         
-        //Draws all the time from the rectangle
-        /*private void drawMousePath(Object sender, EventArgs e)
-        {
-            Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
-            double X = mousePosition.X;
-            double Y = mousePosition.Y;
-
-            Line myLine = new Line();
-            myLine.Stroke = System.Windows.Media.Brushes.LightSteelBlue;
-            myLine.X1 = X;
-            myLine.X2 = X + 1;
-            myLine.Y1 = Y;
-            myLine.Y2 = Y + 1;
-            //myLine.HorizontalAlignment = HorizontalAlignment.Left;
-            //myLine.VerticalAlignment = VerticalAlignment.Center;
-            myLine.StrokeThickness = 5;
-            recordingCanvas.Children.Add(myLine);
-        }*/
-        
         private void OnMouseDown(Object sender, EventArgs e) {
             leftMouseDown = true;
-            //MessageBoxResult results = MessageBox.Show("In OnMouseDown");
         }
 
         private void OnMouseMove(Object sender, EventArgs e)
         {
-            if(leftMouseDown == true)
+            if (timer.IsEnabled)
             {
-                drawMousePath();
+                if (leftMouseDown == true)
+                {
+                    drawMousePath();
+                }
             }
         }
 
@@ -336,24 +313,16 @@ namespace Recording_GUI_2
             double X = mousePosition.X;
             double Y = mousePosition.Y;
 
-            /*
             Ellipse myEllipse = new Ellipse();
-            myEllipse.Stroke = System.Windows.Media.Brushes.LightSteelBlue;
-            myEllipse.Height = 1;
-            myEllipse.Width = 1;
-            myEllipse.
-*/
-            Line myLine = new Line();
-            myLine.Stroke = System.Windows.Media.Brushes.Black;
-            myLine.X1 = X;
-            myLine.X2 = X+1;
-            myLine.Y1 = Y;
-            myLine.Y2 = Y+1;
-            //myLine.HorizontalAlignment = HorizontalAlignment.Left;
-            //myLine.VerticalAlignment = VerticalAlignment.Center;
-            myLine.StrokeThickness = 5;
-            recordingCanvas.Children.Add(myLine);
-        }
+            myEllipse.Stroke = System.Windows.Media.Brushes.Black;
+            myEllipse.StrokeThickness = 5;
+            myEllipse.Height = 5;
+            myEllipse.Width = 5;
+            Canvas.SetTop(myEllipse, Y);
+            //Canvas.SetRight(myEllipse, X);
+            Canvas.SetLeft(myEllipse, X);
+            recordingCanvas.Children.Add(myEllipse);
+       }
     }
 }
 
