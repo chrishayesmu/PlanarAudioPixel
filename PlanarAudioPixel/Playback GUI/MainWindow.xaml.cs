@@ -20,9 +20,42 @@ namespace Playback_GUI
     /// </summary>
     public partial class MainWindow : Window
     {
+        //variables
+        int row = 3;
+        int column = 5;
+        int i = 0;
+        int j = 0;
+        Button[,] closeBtn;
+        
         public MainWindow()
         {
             InitializeComponent();
+            // Create the Grid
+            pixelGrid.ShowGridLines = true;
+            for (i = 0; i < row; i++)
+            {
+                pixelGrid.RowDefinitions.Add(new RowDefinition());
+            }
+            for (j = 0; j < column; j++)
+            {
+                pixelGrid.ColumnDefinitions.Add(new ColumnDefinition());
+            }
+            
+            //rectangles
+            closeBtn = new Button[row, column];
+            for (i = 0; i < row; i++)
+            {
+                for (j = 0; j < column; j++)
+                {
+                    closeBtn[i, j] = new Button();
+                    closeBtn[i, j].Content = "X";
+                    pixelGrid.Children.Add(closeBtn[i, j]);
+                    Grid.SetRow(closeBtn[i,j], i);
+                    Grid.SetColumn(closeBtn[i,j], j);
+ 
+                }
+            }
+            //myWindow.Show();
         }
 
         private void Button_Click_1(object sender, RoutedEventArgs e)
@@ -35,20 +68,16 @@ namespace Playback_GUI
 
         }
 
-        private void Slider_ValueChanged_1(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-
-        }
-
         private void startTime_TextChanged(object sender, TextChangedEventArgs e)
         {
 
         }
 
-        private void Button_Click_2(object sender, RoutedEventArgs e)
+        private void Slider_ValueChanged_1(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
 
         }
+
 
         
     }
