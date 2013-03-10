@@ -3,14 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="MainWindow" Height="350" Width="525">
     <Grid>
-        <Button Content="Play" HorizontalAlignment="Left" Margin="224,264,0,0" VerticalAlignment="Top" Width="75" Click="Button_Click_1"/>
-        <Label Content="Now Playing:" HorizontalAlignment="Left" Margin="21,246,0,0" VerticalAlignment="Top" Width="108"/>
-        <Slider HorizontalAlignment="Left" Margin="367,285,0,0" VerticalAlignment="Top" Width="141" ValueChanged="Slider_ValueChanged_1"/>
-        <Label Content="/" HorizontalAlignment="Left" Margin="424,243,0,0" VerticalAlignment="Top" Width="17"/>
-        <TextBox x:Name="startTime" HorizontalAlignment="Left" Height="23" Margin="376,246,0,0" TextWrapping="Wrap" Text="0:00" VerticalAlignment="Top" Width="43" TextChanged="startTime_TextChanged"/>
-        <TextBox x:Name="endTime" HorizontalAlignment="Left" Height="23" Margin="446,246,0,0" TextWrapping="Wrap" Text="0:00" VerticalAlignment="Top" Width="49" TextChanged="TextBox_TextChanged_1"/>
-        <TextBox HorizontalAlignment="Left" Height="23" Margin="21,277,0,0" TextWrapping="Wrap" Text="No Current Audio" VerticalAlignment="Top" Width="185" TextChanged="TextBox_TextChanged_1"/>
-        <Grid x:Name="pixelGrid" HorizontalAlignment="Left" Height="228" Margin="10,10,0,0" VerticalAlignment="Top" Width="498"/>
+        <Button x:Name="playBtn" Content="Play" HorizontalAlignment="Left" Margin="394,253,0,0" VerticalAlignment="Top" Width="54" Click="Button_Click_1" Height="58" Background="#FF5B54C6"/>
+        <Label x:Name="audioLabel" Content="Audio File:" HorizontalAlignment="Left" Margin="10,249,0,0" VerticalAlignment="Top" Width="96"/>
+        <TextBox x:Name="audioTextbox" HorizontalAlignment="Left" Height="26" Margin="116,253,0,0" TextWrapping="Wrap" Text="No Current Audio File" VerticalAlignment="Top" Width="185" TextChanged="TextBox_TextChanged_1" IsReadOnly="True"/>
+        <Grid x:Name="pixelGrid" HorizontalAlignment="Left" Height="234" Margin="10,10,0,0" VerticalAlignment="Top" Width="498"/>
+        <Label x:Name="positionLabel" Content="Position File:" HorizontalAlignment="Left" Height="29" Margin="10,283,0,0" VerticalAlignment="Top" Width="101"/>
+        <TextBox x:Name="positionTextbox" HorizontalAlignment="Left" Height="25" Margin="116,287,0,0" TextWrapping="Wrap" Text="No Current Position File" VerticalAlignment="Top" Width="185" TextChanged="TextBox_TextChanged_2" IsReadOnly="True"/>
+        <Button x:Name="audioBrowseBtn" Content="Browse" HorizontalAlignment="Left" Height="26" Margin="306,253,0,0" VerticalAlignment="Top" Width="61" Click="audioBrowseBtn_Click"/>
+        <Button x:Name="positionBrowseBtn" Content="Browse" HorizontalAlignment="Left" Height="25" Margin="306,287,0,0" VerticalAlignment="Top" Width="61" Click="positionBrowseBtn_Click"/>
+        <Button x:Name="pauseBtn" Content="Pause" HorizontalAlignment="Left" VerticalAlignment="Top" Width="55" Margin="453,253,0,0" Height="26" Background="#FFF2F364" Click="pauseBtn_Click"/>
+        <Button x:Name="stopBtn" Content="Stop" HorizontalAlignment="Left" VerticalAlignment="Top" Width="55" Margin="453,284,0,0" Height="27" Cursor="" Background="#FFED5E49" Click="stopBtn_Click"/>
 
     </Grid>
 </Window>

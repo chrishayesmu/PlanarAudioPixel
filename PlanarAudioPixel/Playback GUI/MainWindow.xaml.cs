@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using PlanarAudioPixel;
 
 namespace Playback_GUI
 {
@@ -21,11 +22,14 @@ namespace Playback_GUI
     public partial class MainWindow : Window
     {
         //variables
-        int row = 3;
-        int column = 5;
+        int row = 4;
+        int column = 6;
         int i = 0;
         int j = 0;
         Button[,] closeBtn;
+        PlaybackServer playbackServer = new PlaybackServer();
+        string audioFile;
+        string positionFile;
         
         public MainWindow()
         {
@@ -41,26 +45,89 @@ namespace Playback_GUI
                 pixelGrid.ColumnDefinitions.Add(new ColumnDefinition());
             }
             
-            //rectangles
+            //Buttons
             closeBtn = new Button[row, column];
             for (i = 0; i < row; i++)
             {
                 for (j = 0; j < column; j++)
                 {
                     closeBtn[i, j] = new Button();
+                    closeBtn[i, j].Height = 22;
+                    closeBtn[i, j].Width = 22;
+                    closeBtn[i, j].HorizontalAlignment = HorizontalAlignment.Right;
+                    closeBtn[i, j].VerticalAlignment = VerticalAlignment.Top;
                     closeBtn[i, j].Content = "X";
                     pixelGrid.Children.Add(closeBtn[i, j]);
                     Grid.SetRow(closeBtn[i,j], i);
                     Grid.SetColumn(closeBtn[i,j], j);
- 
                 }
             }
-            //myWindow.Show();
+        }
+
+        private void positionBrowseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            //File Browse Button
+
+            // Create OpenFileDialog
+            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
+
+            // Set filter for file extension and default file extension
+            dlg.DefaultExt = ".wav";
+            dlg.Filter = "Audio Files (.wav)|*.wav";
+
+            // Display OpenFileDialog by calling ShowDialog method
+            Nullable<bool> result = dlg.ShowDialog();
+
+            // Get the selected file and display in TextBox
+            if (result == true)
+            {
+                // Open document
+                positionFile = dlg.FileName;
+                positionTextbox.Text = positionFile;
+            }
+
+        }
+
+        private void audioBrowseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            //File Browse Button
+       
+            // Create OpenFileDialog
+            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
+
+            // Set filter for file extension and default file extension
+            dlg.DefaultExt = ".wav";
+            dlg.Filter = "Audio Files (.wav)|*.wav";
+
+            // Display OpenFileDialog by calling ShowDialog method
+            Nullable<bool> result = dlg.ShowDialog();
+
+            // Get the selected file and display in TextBox
+            if (result == true)
+            {
+                // Open document
+                audioFile = dlg.FileName;
+                audioTextbox.Text = audioFile;
+            }
+       
+        }
+
+        private void pauseBtn_Click(object sender, RoutedEventArgs e)
+        {
+            //call Pause() function
+            playbackServer.Pause();
+        }
+
+        private void stopBtn_Click(object sender, RoutedEventArgs e)
+        {
+            //call Stop() function
+            playbackServer.Stop();
         }
 
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
-
+            //play button pressed
+            playbackServer.Play();
         }
 
         private void TextBox_TextChanged_1(object sender, TextChangedEventArgs e)
@@ -68,12 +135,7 @@ namespace Playback_GUI
 
         }
 
-        private void startTime_TextChanged(object sender, TextChangedEventArgs e)
-        {
-
-        }
-
-        private void Slider_ValueChanged_1(object sender, RoutedPropertyChangedEventArgs<double> e)
+        private void TextBox_TextChanged_2(object sender, TextChangedEventArgs e)
         {
 
         }
