@@ -39,9 +39,18 @@ namespace Networking
 		printf( "(UDPClient1 INET ADDRESS is: %s )\n", inet_ntoa( cServer.sin_addr ) );
 		strncpy( cLocalIP, inet_ntoa( cServer.sin_addr ), SIZE_OF_IP_INET_ADDRESSES );
 
+		/*
+		Segmentation fault will occur with bad aHostName
+		*/
 		cHp = gethostbyname( aHostName );
 		bcopy( cHp->h_addr, &(cServer.sin_addr.s_addr), cHp->h_length);
 		cServer.sin_port = htons( atoi( aPortNumber ) );
+		
+		/*
+		cListenerThread = new boost::thread( boost::bind ( &Networking::PlaybackClient::listenerFunction, this ) );
+		playbackFunction();
+		g++ PlaybackClient.cpp -lboost_thread-mt
+		*/
 		}
 
 	/*
@@ -83,6 +92,48 @@ namespace Networking
 			}while( 1 );		
 		}
 	
+	void PlaybackClient::listenerFunction()
+		{
+		int mNewMessages;
+		do
+			{
+			mNewMessages = queueMessagesFromServer();
+			if( mNewMessages != 0 )
+				{
+				std::cout << "Added " << mNewMessages << " to message queues!" << std::endl;
+				}
+			}while( 1 );
+		}
+		
+	void PlaybackClient::playbackFunction()
+		{
+		do
+			{
+			if( !cAudioMessageQueue.empty() )
+				{
+				std::cout << "Handled an Audio message." << std::endl;
+				cAudioMessageQueue.pop();
+				}
+			
+			if( !cVolumeMessageQueue.empty() )
+				{
+				std::cout << "Handled a Volume message." << std::endl;
+				cVolumeMessageQueue.pop();
+				}
+			
+			if( !cNetworkMessageQueue.empty() )
+				{
+				std::cout << "Handled a Network message." << std::endl;
+				if( cNetworkMessageQueue.front().ControlByte == ControlBytes::DISCONNECT )
+					{
+					exit( 1 );
+					}
+				cNetworkMessageQueue.pop();
+				}
+			
+			}while( 1 );
+		}
+	
 	/*
 	This function sends a check in message to the server. Nothing else.
 	*/
@@ -93,7 +144,59 @@ namespace Networking
 		mCheckInMessage.ClientCheckIn.clientID = stringToGuid( cBroadcastIP, cLocalIP );
 		mCheckInMessage.ClientCheckIn.position.x = cXPosition;
 		mCheckInMessage.ClientCheckIn.position.y = cYPosition;
-		sendto( cSocketData, &mCheckInMessage, sizeof( PacketStructures::NetworkMessage ), 0, (const sockaddr*)&cServer, sizeof( cServer ) );
+		sendto( cSocketData, &mCheckInMessage, sizeof( PacketStructures::NetworkMessage ), 0, 
+				(const sockaddr*)&cServer, sizeof( cServer ) );
+		}
+	
+	/*
+	This function checks for messages from the server, parses the messages, and places the messages in the appropriate queue.
+	It returns the number of messages it placed in the queues.
+	*/
+	int PlaybackClient::queueMessagesFromServer()
+		{
+		static int mMessageCount;
+		static bool mNotFinished;
+		static MESSAGEPACKET *mPlaceHolder, mTempNetworkPacket;
+		static PacketStructures::NetworkMessage mTempNetworkMessage;
+		
+		//No messages
+		if( recieveMessageFromServer() == -1 )
+			{
+			return 0;
+			}
+		
+		
+		mMessageCount = 0;
+		/*
+		Need Giancarlo's help to go on
+		*/
+		mNotFinished = false;
+		mPlaceHolder = &cIncomingMessage;
+		do
+			{
+			switch( mPlaceHolder->messageHeader.ControlByte )
+				{
+				case ControlBytes::SENDING_AUDIO:
+					bcopy( mPlaceHolder, &mTempNetworkPacket, 
+							sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
+					cAudioMessageQueue.push( mTempNetworkPacket );
+					break;
+					
+				case ControlBytes::SENDING_VOLUME:
+					bcopy( mPlaceHolder, &mTempNetworkPacket, 
+							sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
+					cVolumeMessageQueue.push( mTempNetworkPacket );
+					break;
+					
+				default:
+					bcopy( mPlaceHolder, &mTempNetworkMessage, sizeof( PacketStructures::NetworkMessage ) );
+					cNetworkMessageQueue.push( mTempNetworkMessage );
+				}
+				
+			mMessageCount++;
+			}while( mNotFinished );
+		
+		return mMessageCount;
 		}
 	
 	}
@@ -104,9 +207,12 @@ int main( int argc, char **argv )
 			{
 			std::cout << "\nError:Incorrect usage\n" << std::endl;
 			std::cout << argv[0] << " <server IP address> <server port #> <client x position> <client y position>" << std::endl;
-			std::cout << "\ni.e.\n" << argv[0] << " 123.456.789.1011 2222 5.2 8.3\n" << std::endl;
+			std::cout << "\ni.e.\n" << argv[0] << " 127.0.1.1 2222 5.2 8.3\n" << std::endl;
 			return -1;
 			}
+		
+		
 		Networking::PlaybackClient mPlaybackClient( argv[1], argv[2], atof( argv[3] ), atof( argv[4] ) );
+		
 		return 0;
 		}
