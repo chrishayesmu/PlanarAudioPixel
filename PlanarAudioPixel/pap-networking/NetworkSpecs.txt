@@ -2,8 +2,14 @@
 Network Specifications
 =================================
 
+0.		Network Structures and Organization
 1.		Client
 2.		Server
+
+0. Network Structures and Organization
+--------------------------------------
+
+0.1			PacketStructures::ClientVolume
 
 1. Client
 ----------
@@ -24,6 +30,58 @@ Network Specifications
 	1.6.2		PAUSE
 	1.6.3		STOP
 
+================================================================================================
+
+0.1 PacketStructures::ClientVolume
+----------------------------------
+From commit bec38d192d5991d238453bf054b2afb4ce473511:
+
+	The ClientVolume structure is a combination of ClientGUIDs and
+	volume-floats to use when filling a network message for sending volume
+	data. It links a client's ID with that client's volume for the sample.
+
+	Plot twist: The ClientVolume structure actually contains two client IDs
+	and two volumes. This is intentional to line the structure up on an 8
+	byte boundary. It allows us to safely cast the incoming data as a
+	ClientVolume array and iterate over it very quickly. This could also be
+	accomplished by introducing explicit byte padding at the end of the
+	structure, but would result in a loss of 4 bytes per client, which is a
+	total of
+
+	(1500 - 32 (available bytes)) / 16 (would-be ClientVolume size) = 91
+	client slots.
+	=>
+	91 (client slots) * 4 (byte loss per client)  + ((1500 - 32) - (91 *
+	16)) (imperfect fitting data loss) = 364 + 12 = 376 byte loss.
+	=>
+	376 (bytes lost) / 16 (would-be ClientVolume size) = 23 client slots
+	lost + 8 extra bytes just lost.
+
+	--------------------------------
+
+	ClientVolume structure with two clients in it:
+	size is 24 bytes.
+	(1500 - 32) (available bytes) / 24 (size of ClientVolume) = 61
+	structures.
+	=>
+	61 (structures) * 2 (client slots per structure) = 122 client slots + 4
+	extra bytes just lost
+
+	-------------------
+	Improvement:
+	+ 31 client slots
+	+ 4 bytes used
+
+	-----------------------
+	Class layout:
+	2>  NetworkStructures.cpp
+	2>  class ClientVolume size(24):
+	2>   +---
+	2>   0 | ClientGUID clientID_1
+	2>   8 | clientVolume_1
+	2>  12 | clientVolume_2
+	2>  16 | ClientGUID clientID_2
+	2>   +---
 
 1.1 Connecting
 --------------
