@@ -35,7 +35,7 @@ namespace Networking
 		gethostname( cBroadcastIP, SIZE_OF_IP_INET_ADDRESSES );
 		printf( "----UDPClient1 running at host NAME: %s\n", cBroadcastIP );
 		cHp = gethostbyname( cBroadcastIP );
-		bcopy( cHp->h_addr, &( cServer.sin_addr ), cHp->h_length );
+		memcpy( &( cServer.sin_addr ), cHp->h_addr, cHp->h_length );
 		printf( "(UDPClient1 INET ADDRESS is: %s )\n", inet_ntoa( cServer.sin_addr ) );
 		strncpy( cLocalIP, inet_ntoa( cServer.sin_addr ), SIZE_OF_IP_INET_ADDRESSES );
 
@@ -43,7 +43,7 @@ namespace Networking
 		Segmentation fault will occur with bad aHostName
 		*/
 		cHp = gethostbyname( aHostName );
-		bcopy( cHp->h_addr, &(cServer.sin_addr.s_addr), cHp->h_length);
+		memcpy( &(cServer.sin_addr.s_addr), cHp->h_addr, cHp->h_length);
 		cServer.sin_port = htons( atoi( aPortNumber ) );
 		
 		/*
@@ -64,14 +64,10 @@ namespace Networking
 		{
 		int mRecieve;
 		time_t mStart;
-		PacketStructures::NetworkMessage mConnectionMessage, mServerResponseMessage;
-		mConnectionMessage.ControlByte = ControlBytes::NEW_CONNECTION;
-		mConnectionMessage.ClientConnection.clientID = stringToGuid( cBroadcastIP, cLocalIP );
-		mConnectionMessage.ClientConnection.position.x = cXPosition;
-		mConnectionMessage.ClientConnection.position.y = cYPosition;
+		PacketStructures::NetworkMessage mServerResponseMessage;
 		do
 			{
-			sendto( cSocketData, &mConnectionMessage, sizeof( PacketStructures::NetworkMessage ), 0, (const sockaddr*)&cServer, sizeof( cServer ) );
+			sendMessageToServer( ControlBytes::NEW_CONNECTION );
 			
 			mStart = time( NULL );
 			while( time( NULL ) - mStart > cClientReceivedPacketTimeout )
@@ -109,16 +105,16 @@ namespace Networking
 		{
 		do
 			{
-			if( !cAudioMessageQueue.empty() )
+			if( !cAudioMessageList.empty() )
 				{
 				std::cout << "Handled an Audio message." << std::endl;
-				cAudioMessageQueue.pop();
+				cAudioMessageList.pop_front();
 				}
 			
-			if( !cVolumeMessageQueue.empty() )
+			if( !cVolumeMessageList.empty() )
 				{
 				std::cout << "Handled a Volume message." << std::endl;
-				cVolumeMessageQueue.pop();
+				cVolumeMessageList.pop_front();
 				}
 			
 			if( !cNetworkMessageQueue.empty() )
@@ -139,13 +135,21 @@ namespace Networking
 	*/
 	void PlaybackClient::checkInWithServer()
 		{
+		sendMessageToServer( ControlBytes::PERIODIC_CHECK_IN );
+		}
+		
+	int PlaybackClient::sendMessageToServer( const unsigned char aControlByte, int64_t aExtra )	
+		{
 		PacketStructures::NetworkMessage mCheckInMessage;
-		mCheckInMessage.ControlByte = ControlBytes::PERIODIC_CHECK_IN;
 		mCheckInMessage.ClientCheckIn.clientID = stringToGuid( cBroadcastIP, cLocalIP );
 		mCheckInMessage.ClientCheckIn.position.x = cXPosition;
 		mCheckInMessage.ClientCheckIn.position.y = cYPosition;
-		sendto( cSocketData, &mCheckInMessage, sizeof( PacketStructures::NetworkMessage ), 0, 
-				(const sockaddr*)&cServer, sizeof( cServer ) );
+		
+		mCheckInMessage.ControlByte = aControlByte;
+		mCheckInMessage.Extra._extra = aExtra;
+		
+		return sendto( cSocketData, &mCheckInMessage, sizeof( PacketStructures::NetworkMessage ), 0, 
+						(const sockaddr*)&cServer, sizeof( cServer ) );
 		}
 	
 	/*
@@ -164,8 +168,7 @@ namespace Networking
 			{
 			return 0;
 			}
-		
-		
+				
 		mMessageCount = 0;
 		/*
 		Need Giancarlo's help to go on
@@ -177,19 +180,21 @@ namespace Networking
 			switch( mPlaceHolder->messageHeader.ControlByte )
 				{
 				case ControlBytes::SENDING_AUDIO:
-					bcopy( mPlaceHolder, &mTempNetworkPacket, 
+					recieveMessageFromServer( mPlaceHolder->messageHeader.Extra._dataLength, mPlaceHolder->data );
+					memcpy( &mTempNetworkPacket, mPlaceHolder, 
 							sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
-					cAudioMessageQueue.push( mTempNetworkPacket );
+					cAudioMessageList.push_back( mTempNetworkPacket );
 					break;
 					
 				case ControlBytes::SENDING_VOLUME:
-					bcopy( mPlaceHolder, &mTempNetworkPacket, 
+					recieveMessageFromServer( mPlaceHolder->messageHeader.Extra._dataLength, mPlaceHolder->data );
+					memcpy( &mTempNetworkPacket, mPlaceHolder, 
 							sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
-					cVolumeMessageQueue.push( mTempNetworkPacket );
+					cVolumeMessageList.push_back( mTempNetworkPacket );
 					break;
 					
 				default:
-					bcopy( mPlaceHolder, &mTempNetworkMessage, sizeof( PacketStructures::NetworkMessage ) );
+					memcpy( &mTempNetworkMessage, mPlaceHolder, sizeof( PacketStructures::NetworkMessage ) );
 					cNetworkMessageQueue.push( mTempNetworkMessage );
 				}
 				
@@ -198,9 +203,102 @@ namespace Networking
 		
 		return mMessageCount;
 		}
-	
-	}
+		
+	int PlaybackClient::checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket )
+		{
+		static int mAudioPacketCounter = 0, mVolumePacketCounter = 0;
+		
+		switch( aMessagePacket.messageHeader.ControlByte )
+			{
+			//cAudioMessageListExtraPackets
+			case ControlBytes::SENDING_AUDIO:
+				if( cAudioMessageList.empty() )
+					{
+					cAudioMessageList.push_back( aMessagePacket );
+					}
+				else if( aMessagePacket.messageHeader.AudioSample.SampleID == cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+					{
+					mAudioPacketCounter = 0;
+					cAudioMessageList.push_back( aMessagePacket );
+					
+					cAudioMessageListExtraPackets.sort();
+					while( !cAudioMessageListExtraPackets.empty() )
+						{
+						if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
+								< cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+							{
+							cAudioMessageListExtraPackets.pop_front();
+							}
+						else if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
+								== cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+							{
+							cAudioMessageList.push_back( cAudioMessageListExtraPackets.front() );
+							cAudioMessageListExtraPackets.pop_front();
+							}
+						else
+							{
+							break;
+							}
+						}
+					}
+				else
+					{
+					mAudioPacketCounter++;
+					cAudioMessageListExtraPackets.push_back( aMessagePacket );
+					}
+				
+				if( mAudioPacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS )
+					{
+					sendMessageToServer( ControlBytes::RESEND_AUDIO );	
+					}
+				break;
+			
+			default:
+				if( cVolumeMessageList.empty() )
+					{
+					cVolumeMessageList.push_back( aMessagePacket );
+					}
+				else if( aMessagePacket.messageHeader.AudioSample.SampleID == cVolumeMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+					{
+					mVolumePacketCounter = 0;
+					cVolumeMessageList.push_back( aMessagePacket );
+					cVolumeMessageListExtraPackets.sort();
+					while( !cVolumeMessageListExtraPackets.empty() )
+						{
+						if( cVolumeMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
+								< cVolumeMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+							{
+							cVolumeMessageListExtraPackets.pop_front();
+							}
+						else if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
+								== cVolumeMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+							{
+							cVolumeMessageList.push_back( cAudioMessageListExtraPackets.front() );
+							cVolumeMessageListExtraPackets.pop_front();
+							}
+						else
+							{
+							break;
+							}
+						}
+					}
+				else
+					{
+					mVolumePacketCounter++;
+					cVolumeMessageListExtraPackets.push_back( aMessagePacket );
+					}
+				
+				if( mVolumePacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS )
+					{
+					sendMessageToServer( ControlBytes::RESEND_VOLUME );	
+					}
+			}
+		
+		return 0;
+		}
 
+	}
+	
 int main( int argc, char **argv )
 		{
 		if( argc != 5 )

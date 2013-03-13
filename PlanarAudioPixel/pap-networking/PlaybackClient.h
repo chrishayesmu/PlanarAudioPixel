@@ -4,6 +4,7 @@
 #include "NetworkStructures.h"
 #include "Socket.h"
 #include <queue>
+#include <list>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +15,7 @@
 #include <boost/date_time.hpp>
 #include <boost/bind.hpp>
 */
-
+#define NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS 5
 #define SIZE_OF_PAYLOAD 1468
 #define SIZE_OF_IP_INET_ADDRESSES 50
 
@@ -33,12 +34,24 @@ namespace Networking
 	*/
 	bool operator < ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 )
 		{
-		return messagePacket1.messageHeader.AudioSample.SampleID > messagePacket2.messageHeader.AudioSample.SampleID;	
+		switch( messagePacket1.messageHeader.ControlByte )
+			{
+			case ControlBytes::SENDING_AUDIO:
+				return messagePacket1.messageHeader.AudioSample.SampleID > messagePacket2.messageHeader.AudioSample.SampleID;
+			default:
+				return messagePacket1.messageHeader.VolumeSample.SampleID > messagePacket2.messageHeader.VolumeSample.SampleID;
+			}
 		}
 	
 	bool operator > ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 )
 		{
-		return messagePacket1.messageHeader.VolumeSample.SampleID > messagePacket2.messageHeader.VolumeSample.SampleID;
+		switch( messagePacket1.messageHeader.ControlByte )
+			{
+			case ControlBytes::SENDING_AUDIO:
+				return messagePacket1.messageHeader.AudioSample.SampleID < messagePacket2.messageHeader.AudioSample.SampleID;
+			default:
+				return messagePacket1.messageHeader.VolumeSample.SampleID < messagePacket2.messageHeader.VolumeSample.SampleID;
+			}
 		}
 
 	Networking::ClientGUID stringToGuid( char *aBroadCastIP, char *aLocalIP );
@@ -54,11 +67,14 @@ namespace Networking
 			void listenerFunction();
 			void playbackFunction();
 			
-			int recieveMessageFromServer()
+			int recieveMessageFromServer( int aSize = sizeof( PacketStructures::NetworkMessage ), void *aAddressPtr = NULL )
 				{
-				return recv ( cSocketData, &cIncomingMessage, sizeof( MESSAGEPACKET ), 0 );
+				return recv ( cSocketData, ( aAddressPtr == NULL ) ? &cIncomingMessage : aAddressPtr, aSize, 0 );
 				}
+			int sendMessageToServer( const unsigned char aControlByte = ControlBytes::SYNCHRONIZATION_REQUEST, int64_t aExtra = 0 );
+			
 			int queueMessagesFromServer();
+			int checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket );
 			
 		private:
 		
@@ -73,15 +89,11 @@ namespace Networking
 			
 			time_t cClientReceivedPacketTimeout;
 			
-			std::priority_queue<MESSAGEPACKET, 
-								std::vector<MESSAGEPACKET>, 
-								std::less<std::vector<MESSAGEPACKET>::value_type> > cAudioMessageQueue;
-								
-			std::priority_queue<MESSAGEPACKET, 
-								std::vector<MESSAGEPACKET>, 
-								std::greater<std::vector<MESSAGEPACKET>::value_type> > cVolumeMessageQueue;
-			
+			std::list<MESSAGEPACKET> cAudioMessageList, cAudioMessageListExtraPackets;
+			std::list<MESSAGEPACKET> cVolumeMessageList, cVolumeMessageListExtraPackets;
 			std::queue<PacketStructures::NetworkMessage> cNetworkMessageQueue;
+			
+			
 			
 			MESSAGEPACKET cIncomingMessage;
 			
