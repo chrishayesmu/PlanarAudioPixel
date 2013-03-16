@@ -4,6 +4,8 @@
 #include "ControlByteConstants.h"
 #include "NetworkConstants.h"
 
+/******************************Needs Work******************************/
+
 namespace Networking 
 	{
 	/*
@@ -63,16 +65,19 @@ namespace Networking
 	void PlaybackClient::connectToServer() 
 		{
 		int mRecieve;
-		time_t mStart;
-		PacketStructures::NetworkMessage mServerResponseMessage;
+		timeval mTimeoutTime, mCurrentTime;
+		
 		do
 			{
 			sendMessageToServer( ControlBytes::NEW_CONNECTION );
 			
-			mStart = time( NULL );
-			while( time( NULL ) - mStart > cClientReceivedPacketTimeout )
+			gettimeofday( &mTimeoutTime, 0 );
+			gettimeofday( &mCurrentTime, 0 );
+			
+			while( ( mCurrentTime.tv_sec - mTimeoutTime.tv_sec ) * 1000 + ( mCurrentTime.tv_usec - mTimeoutTime.tv_usec ) / 1000 
+					< PACKETRECEIPTTIMEOUT )
 				{
-				if( recieveMessageFromServer() != -1 )
+				if( ( mRecieve = recieveMessageFromServer() ) != -1 )
 					{
 					break;
 					}
@@ -91,8 +96,19 @@ namespace Networking
 	void PlaybackClient::listenerFunction()
 		{
 		int mNewMessages;
+		timeval mCheckInTime, mCurrentTime;
+		gettimeofday( &mCheckInTime, 0 );
+		
 		do
 			{
+			gettimeofday( &mCurrentTime, 0 );
+			if( ( mCurrentTime.tv_sec - mCheckInTime.tv_sec ) * 1000 + ( mCurrentTime.tv_usec - mCheckInTime.tv_usec ) / 1000 
+					> CLIENT_CHECKIN_DELAY )
+				{
+				checkInWithServer();
+				gettimeofday( &mCheckInTime, 0 );
+				}
+			
 			mNewMessages = queueMessagesFromServer();
 			if( mNewMessages != 0 )
 				{
@@ -105,6 +121,8 @@ namespace Networking
 		{
 		do
 			{
+			/******************************Needs Work******************************/
+			//Waiting for Chris' stuff
 			if( !cAudioMessageList.empty() )
 				{
 				std::cout << "Handled an Audio message." << std::endl;
@@ -137,18 +155,52 @@ namespace Networking
 		{
 		sendMessageToServer( ControlBytes::PERIODIC_CHECK_IN );
 		}
-		
-	int PlaybackClient::sendMessageToServer( const unsigned char aControlByte, int64_t aExtra )	
+	
+	/*
+	Creates and sends messages to servers.
+	*/
+	int PlaybackClient::sendMessageToServer( const unsigned char aControlByte, 
+											Networking::trackid_t aTrackID,
+											Networking::sampleid_t aSampleID,
+											Networking::sampleid_t aBufferRangeStartID,
+											Networking::sampleid_t aBufferRangeEndID,
+											Networking::requestid_t aRequestID )
 		{
-		PacketStructures::NetworkMessage mCheckInMessage;
-		mCheckInMessage.ClientCheckIn.clientID = stringToGuid( cBroadcastIP, cLocalIP );
-		mCheckInMessage.ClientCheckIn.position.x = cXPosition;
-		mCheckInMessage.ClientCheckIn.position.y = cYPosition;
+		PacketStructures::NetworkMessage mMessage;
+		mMessage.ControlByte = aControlByte;
 		
-		mCheckInMessage.ControlByte = aControlByte;
-		mCheckInMessage.Extra._extra = aExtra;
-		
-		return sendto( cSocketData, &mCheckInMessage, sizeof( PacketStructures::NetworkMessage ), 0, 
+		switch( aControlByte )
+			{
+			case ControlBytes::RESEND_AUDIO:
+			case ControlBytes::RESEND_VOLUME:
+				//Same data types for audio resend and volume resend, so handle both in same statement
+				mMessage.AudioResendRequest.TrackID = aTrackID;
+				mMessage.AudioResendRequest.SampleID = aSampleID;
+				mMessage.AudioResendRequest.BufferRangeStartID = aBufferRangeStartID;
+				mMessage.AudioResendRequest.BufferRangeEndID = aBufferRangeEndID;			
+				break;
+				
+			case ControlBytes::BEGIN_PLAYBACK:
+			case ControlBytes::STOP_PLAYBACK:
+			case ControlBytes::PAUSE_PLAYBACK:
+				/*
+				I didn't see and acknowledgment control byte, so I assume you reseond with the same type of byte you
+				are acknowledging.
+				*/
+				mMessage.TransportControl.clientID = stringToGuid( cBroadcastIP, cLocalIP );
+				mMessage.TransportControl.requestID = aRequestID;
+				break;
+				
+			default:
+				/*
+				All other client to server messages have the following data types
+				*/
+				mMessage.ClientCheckIn.clientID = stringToGuid( cBroadcastIP, cLocalIP );
+				mMessage.ClientCheckIn.position.x = cXPosition;
+				mMessage.ClientCheckIn.position.y = cYPosition;
+			}
+
+		return sendto( cSocketData, &mMessage, sizeof( PacketStructures::NetworkMessage ), 0, 
 						(const sockaddr*)&cServer, sizeof( cServer ) );
 		}
 	
@@ -158,7 +210,6 @@ namespace Networking
 	*/
 	int PlaybackClient::queueMessagesFromServer()
 		{
-		static int mMessageCount;
 		static bool mNotFinished;
 		static MESSAGEPACKET *mPlaceHolder, mTempNetworkPacket;
 		static PacketStructures::NetworkMessage mTempNetworkMessage;
@@ -169,28 +220,32 @@ namespace Networking
 			return 0;
 			}
 				
-		mMessageCount = 0;
-		/*
-		Need Giancarlo's help to go on
-		*/
+		
 		mNotFinished = false;
 		mPlaceHolder = &cIncomingMessage;
 		do
 			{
 			switch( mPlaceHolder->messageHeader.ControlByte )
 				{
-				case ControlBytes::SENDING_AUDIO:
-					recieveMessageFromServer( mPlaceHolder->messageHeader.Extra._dataLength, mPlaceHolder->data );
-					memcpy( &mTempNetworkPacket, mPlaceHolder, 
-							sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
-					cAudioMessageList.push_back( mTempNetworkPacket );
-					break;
+				case ControlBytes::DISCONNECT:
+					exit( ControlBytes::DISCONNECT );
 					
+				case ControlBytes::SENDING_AUDIO:
 				case ControlBytes::SENDING_VOLUME:
 					recieveMessageFromServer( mPlaceHolder->messageHeader.Extra._dataLength, mPlaceHolder->data );
 					memcpy( &mTempNetworkPacket, mPlaceHolder, 
 							sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
-					cVolumeMessageList.push_back( mTempNetworkPacket );
+					checkForDroppedPacketsAndAddPacketToList( mTempNetworkPacket );
+					break;
+				
+				case ControlBytes::BEGIN_PLAYBACK:
+				case ControlBytes::STOP_PLAYBACK:
+				case ControlBytes::PAUSE_PLAYBACK:
+					/******************************Needs Work******************************/
+					//Need to actually write a function to handle begin, stop, and pause playback
+					sendMessageToServer( mPlaceHolder->messageHeader.ControlByte, 
+										0, 0, 0, 0, //placeholders to get to last field
+										mPlaceHolder->messageHeader.TransportControl.requestID );
 					break;
 					
 				default:
@@ -198,15 +253,16 @@ namespace Networking
 					cNetworkMessageQueue.push( mTempNetworkMessage );
 				}
 				
-			mMessageCount++;
 			}while( mNotFinished );
 		
-		return mMessageCount;
+		return 0;
 		}
 		
 	int PlaybackClient::checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket )
 		{
 		static int mAudioPacketCounter = 0, mVolumePacketCounter = 0;
+		/******************************Needs Work******************************/
+		//Need to properly build resend packets
 		
 		switch( aMessagePacket.messageHeader.ControlByte )
 			{
@@ -214,6 +270,7 @@ namespace Networking
 			case ControlBytes::SENDING_AUDIO:
 				if( cAudioMessageList.empty() )
 					{
+					mAudioPacketCounter = 0;
 					cAudioMessageList.push_back( aMessagePacket );
 					}
 				else if( aMessagePacket.messageHeader.AudioSample.SampleID == cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1 )
@@ -249,29 +306,34 @@ namespace Networking
 				
 				if( mAudioPacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS )
 					{
-					sendMessageToServer( ControlBytes::RESEND_AUDIO );	
+					sendMessageToServer( ControlBytes::RESEND_AUDIO,
+										cAudioMessageList.back().messageHeader.AudioSample.TrackID,
+										cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1,
+										cAudioMessageList.back().messageHeader.AudioSample.BufferRangeStartID,
+										cAudioMessageList.back().messageHeader.AudioSample.BufferRangeEndID );	
 					}
 				break;
 			
 			default:
 				if( cVolumeMessageList.empty() )
 					{
+					mVolumePacketCounter = 0;
 					cVolumeMessageList.push_back( aMessagePacket );
 					}
-				else if( aMessagePacket.messageHeader.AudioSample.SampleID == cVolumeMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+				else if( aMessagePacket.messageHeader.VolumeSample.SampleID == cVolumeMessageList.back().messageHeader.VolumeSample.SampleID + 1 )
 					{
 					mVolumePacketCounter = 0;
 					cVolumeMessageList.push_back( aMessagePacket );
 					cVolumeMessageListExtraPackets.sort();
 					while( !cVolumeMessageListExtraPackets.empty() )
 						{
-						if( cVolumeMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
-								< cVolumeMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+						if( cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
+								< cVolumeMessageList.back().messageHeader.VolumeSample.SampleID + 1 )
 							{
 							cVolumeMessageListExtraPackets.pop_front();
 							}
-						else if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
-								== cVolumeMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+						else if( cAudioMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
+								== cVolumeMessageList.back().messageHeader.VolumeSample.SampleID + 1 )
 							{
 							cVolumeMessageList.push_back( cAudioMessageListExtraPackets.front() );
 							cVolumeMessageListExtraPackets.pop_front();
@@ -290,7 +352,11 @@ namespace Networking
 				
 				if( mVolumePacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS )
 					{
-					sendMessageToServer( ControlBytes::RESEND_VOLUME );	
+					sendMessageToServer( ControlBytes::RESEND_VOLUME,
+										cAudioMessageList.back().messageHeader.VolumeSample.TrackID,
+										cAudioMessageList.back().messageHeader.VolumeSample.SampleID + 1,
+										cAudioMessageList.back().messageHeader.VolumeSample.BufferRangeStartID,
+										cAudioMessageList.back().messageHeader.VolumeSample.BufferRangeEndID );
 					}
 			}
 		

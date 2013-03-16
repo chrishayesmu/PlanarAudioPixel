@@ -10,11 +10,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <queue>
+#include <sys/time.h>
 /*
 #include <boost/thread.hpp>  
 #include <boost/date_time.hpp>
 #include <boost/bind.hpp>
 */
+#define PACKETRECEIPTTIMEOUT 2000
 #define NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS 5
 #define SIZE_OF_PAYLOAD 1468
 #define SIZE_OF_IP_INET_ADDRESSES 50
@@ -37,9 +39,23 @@ namespace Networking
 		switch( messagePacket1.messageHeader.ControlByte )
 			{
 			case ControlBytes::SENDING_AUDIO:
-				return messagePacket1.messageHeader.AudioSample.SampleID > messagePacket2.messageHeader.AudioSample.SampleID;
+				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
+					{
+					return messagePacket1.messageHeader.AudioSample.TrackID > messagePacket2.messageHeader.AudioSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.AudioSample.SampleID > messagePacket2.messageHeader.AudioSample.SampleID;
+					}
 			default:
-				return messagePacket1.messageHeader.VolumeSample.SampleID > messagePacket2.messageHeader.VolumeSample.SampleID;
+				if( messagePacket1.messageHeader.VolumeSample.TrackID != messagePacket2.messageHeader.VolumeSample.TrackID )
+					{
+					return messagePacket1.messageHeader.VolumeSample.TrackID > messagePacket2.messageHeader.VolumeSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.VolumeSample.SampleID > messagePacket2.messageHeader.VolumeSample.SampleID;
+					}
 			}
 		}
 	
@@ -48,9 +64,23 @@ namespace Networking
 		switch( messagePacket1.messageHeader.ControlByte )
 			{
 			case ControlBytes::SENDING_AUDIO:
-				return messagePacket1.messageHeader.AudioSample.SampleID < messagePacket2.messageHeader.AudioSample.SampleID;
+				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
+					{
+					return messagePacket1.messageHeader.AudioSample.TrackID < messagePacket2.messageHeader.AudioSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.AudioSample.SampleID < messagePacket2.messageHeader.AudioSample.SampleID;
+					}
 			default:
-				return messagePacket1.messageHeader.VolumeSample.SampleID < messagePacket2.messageHeader.VolumeSample.SampleID;
+				if( messagePacket1.messageHeader.VolumeSample.TrackID != messagePacket2.messageHeader.VolumeSample.TrackID )
+					{
+					return messagePacket1.messageHeader.VolumeSample.TrackID < messagePacket2.messageHeader.VolumeSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.VolumeSample.SampleID < messagePacket2.messageHeader.VolumeSample.SampleID;
+					}
 			}
 		}
 
@@ -71,7 +101,13 @@ namespace Networking
 				{
 				return recv ( cSocketData, ( aAddressPtr == NULL ) ? &cIncomingMessage : aAddressPtr, aSize, 0 );
 				}
-			int sendMessageToServer( const unsigned char aControlByte = ControlBytes::SYNCHRONIZATION_REQUEST, int64_t aExtra = 0 );
+			
+			int sendMessageToServer( const unsigned char aControlByte = ControlBytes::SYNCHRONIZATION_REQUEST, 
+									Networking::trackid_t aTrackID = 0,
+									Networking::sampleid_t aSampleID = 0,
+									Networking::sampleid_t aBufferRangeStartID = 0,
+									Networking::sampleid_t aBufferRangeEndID = 0,
+									Networking::requestid_t aRequestID = 0 );
 			
 			int queueMessagesFromServer();
 			int checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket );
@@ -86,8 +122,6 @@ namespace Networking
 			char cBroadcastIP[SIZE_OF_IP_INET_ADDRESSES], cLocalIP[SIZE_OF_IP_INET_ADDRESSES];
 			
 			float cXPosition, cYPosition;
-			
-			time_t cClientReceivedPacketTimeout;
 			
 			std::list<MESSAGEPACKET> cAudioMessageList, cAudioMessageListExtraPackets;
 			std::list<MESSAGEPACKET> cVolumeMessageList, cVolumeMessageListExtraPackets;
