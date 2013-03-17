@@ -28,17 +28,22 @@ namespace Networking
 		: 	cXPosition( aXPosition ),
 			cYPosition( aYPosition )
 		{
+		Logger::openLogFile();
+		Logger::logNotice( "Starting playback client" );
+		
 		cSocketData = socket( AF_INET, SOCK_DGRAM, 0 );
 		cServer.sin_family = AF_INET;
 		
 		/*
 		Get local machine info
 		*/
+		/******************************Needs Work******************************/
+		//Need to figure out how to get a local ip address
 		gethostname( cBroadcastIP, SIZE_OF_IP_INET_ADDRESSES );
-		printf( "----UDPClient1 running at host NAME: %s\n", cBroadcastIP );
+		Logger::logNotice( "----UDPClient1 running at host NAME: %s", cBroadcastIP );
 		cHp = gethostbyname( cBroadcastIP );
 		memcpy( &( cServer.sin_addr ), cHp->h_addr, cHp->h_length );
-		printf( "(UDPClient1 INET ADDRESS is: %s )\n", inet_ntoa( cServer.sin_addr ) );
+		Logger::logNotice( "(UDPClient1 INET ADDRESS is: %s )", inet_ntoa( cServer.sin_addr ) );
 		strncpy( cLocalIP, inet_ntoa( cServer.sin_addr ), SIZE_OF_IP_INET_ADDRESSES );
 
 		/*
@@ -54,7 +59,7 @@ namespace Networking
 		g++ PlaybackClient.cpp -lboost_thread-mt
 		*/
 		}
-
+		
 	/*
 	1)This function broadcasts a new connection message
 	2)After broadcasting the message, it waits to recieve a response from the server.
@@ -66,9 +71,11 @@ namespace Networking
 		{
 		int mRecieve;
 		timeval mTimeoutTime, mCurrentTime;
+		Logger::logNotice( "Connecting to server" );
 		
 		do
 			{
+			Logger::logNotice( "Sending NEW_CONNECTION packet" );
 			sendMessageToServer( ControlBytes::NEW_CONNECTION );
 			
 			gettimeofday( &mTimeoutTime, 0 );
@@ -87,9 +94,13 @@ namespace Networking
 				{
 				if( cIncomingMessage.messageHeader.ControlByte == ControlBytes::NEW_CONNECTION )
 					{
+					Logger::logNotice( "Received NEW_CONNECTION packet" );
+					Logger::logNotice( "Successfully connected to server" );
 					return;
 					}
 				}
+			
+			Logger::logNotice( "Server response to NEW_CONNECTION timed out." );
 			}while( 1 );		
 		}
 	
@@ -105,14 +116,16 @@ namespace Networking
 			if( ( mCurrentTime.tv_sec - mCheckInTime.tv_sec ) * 1000 + ( mCurrentTime.tv_usec - mCheckInTime.tv_usec ) / 1000 
 					> CLIENT_CHECKIN_DELAY )
 				{
+				Logger::logNotice( "Initiating periodic check in with server" );
 				checkInWithServer();
+				Logger::logNotice( "PERIODIC_CHECK_IN packet sent" );
 				gettimeofday( &mCheckInTime, 0 );
 				}
 			
 			mNewMessages = queueMessagesFromServer();
 			if( mNewMessages != 0 )
 				{
-				std::cout << "Added " << mNewMessages << " to message queues!" << std::endl;
+				Logger::logNotice( "Added %d new messages to message queues!", mNewMessages );
 				}
 			}while( 1 );
 		}
@@ -125,23 +138,27 @@ namespace Networking
 			//Waiting for Chris' stuff
 			if( !cAudioMessageList.empty() )
 				{
-				std::cout << "Handled an Audio message." << std::endl;
+				Logger::logNotice( "Handled an Audio message."  );
 				cAudioMessageList.pop_front();
 				}
 			
 			if( !cVolumeMessageList.empty() )
 				{
-				std::cout << "Handled a Volume message." << std::endl;
+				Logger::logNotice( "Handled a Volume message."  );
 				cVolumeMessageList.pop_front();
 				}
 			
 			if( !cNetworkMessageQueue.empty() )
 				{
-				std::cout << "Handled a Network message." << std::endl;
+				Logger::logNotice( "Handled a Network message."  );
+				
 				if( cNetworkMessageQueue.front().ControlByte == ControlBytes::DISCONNECT )
 					{
+					Logger::logNotice( "Recieved exit message from server. Exiting playback client." );
+					Logger::closeLogFile();
 					exit( 1 );
 					}
+
 				cNetworkMessageQueue.pop();
 				}
 			
@@ -177,7 +194,9 @@ namespace Networking
 				mMessage.AudioResendRequest.TrackID = aTrackID;
 				mMessage.AudioResendRequest.SampleID = aSampleID;
 				mMessage.AudioResendRequest.BufferRangeStartID = aBufferRangeStartID;
-				mMessage.AudioResendRequest.BufferRangeEndID = aBufferRangeEndID;			
+				mMessage.AudioResendRequest.BufferRangeEndID = aBufferRangeEndID;
+				
+				Logger::logNotice( "Created a RESEND packet." );
 				break;
 				
 			case ControlBytes::BEGIN_PLAYBACK:
@@ -189,6 +208,8 @@ namespace Networking
 				*/
 				mMessage.TransportControl.clientID = stringToGuid( cBroadcastIP, cLocalIP );
 				mMessage.TransportControl.requestID = aRequestID;
+				
+				Logger::logNotice( "Created a TransportControl packet." );
 				break;
 				
 			default:
@@ -198,8 +219,11 @@ namespace Networking
 				mMessage.ClientCheckIn.clientID = stringToGuid( cBroadcastIP, cLocalIP );
 				mMessage.ClientCheckIn.position.x = cXPosition;
 				mMessage.ClientCheckIn.position.y = cYPosition;
+				
+				Logger::logNotice( "Created a network message packet." );
 			}
-
+		
+		Logger::logNotice( "Sending packet to server." );
 		return sendto( cSocketData, &mMessage, sizeof( PacketStructures::NetworkMessage ), 0, 
 						(const sockaddr*)&cServer, sizeof( cServer ) );
 		}
@@ -232,6 +256,8 @@ namespace Networking
 					
 				case ControlBytes::SENDING_AUDIO:
 				case ControlBytes::SENDING_VOLUME:
+					Logger::logNotice( "Received an Audio/Volume packet." );
+					
 					recieveMessageFromServer( mPlaceHolder->messageHeader.Extra._dataLength, mPlaceHolder->data );
 					memcpy( &mTempNetworkPacket, mPlaceHolder, 
 							sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
@@ -241,6 +267,8 @@ namespace Networking
 				case ControlBytes::BEGIN_PLAYBACK:
 				case ControlBytes::STOP_PLAYBACK:
 				case ControlBytes::PAUSE_PLAYBACK:
+					Logger::logNotice( "Received a TransportControl packet." );
+					
 					/******************************Needs Work******************************/
 					//Need to actually write a function to handle begin, stop, and pause playback
 					sendMessageToServer( mPlaceHolder->messageHeader.ControlByte, 
@@ -249,6 +277,8 @@ namespace Networking
 					break;
 					
 				default:
+					Logger::logNotice( "Received a network message packet." );
+					
 					memcpy( &mTempNetworkMessage, mPlaceHolder, sizeof( PacketStructures::NetworkMessage ) );
 					cNetworkMessageQueue.push( mTempNetworkMessage );
 				}
@@ -262,7 +292,6 @@ namespace Networking
 		{
 		static int mAudioPacketCounter = 0, mVolumePacketCounter = 0;
 		/******************************Needs Work******************************/
-		//Need to properly build resend packets
 		
 		switch( aMessagePacket.messageHeader.ControlByte )
 			{
@@ -312,6 +341,8 @@ namespace Networking
 										cAudioMessageList.back().messageHeader.AudioSample.BufferRangeStartID,
 										cAudioMessageList.back().messageHeader.AudioSample.BufferRangeEndID );	
 					}
+				
+				Logger::logNotice( "Sent a RESEND_AUDIO packet to server." );
 				break;
 			
 			default:
@@ -358,6 +389,8 @@ namespace Networking
 										cAudioMessageList.back().messageHeader.VolumeSample.BufferRangeStartID,
 										cAudioMessageList.back().messageHeader.VolumeSample.BufferRangeEndID );
 					}
+				
+				Logger::logNotice( "Sent a RESEND_VOLUME packet to server." );
 			}
 		
 		return 0;
