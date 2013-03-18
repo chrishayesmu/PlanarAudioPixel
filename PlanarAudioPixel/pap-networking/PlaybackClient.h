@@ -95,6 +95,7 @@ namespace Networking
 			void checkInWithServer();
 			
 			void listenerFunction();
+			void changePlaybackStatus(  const unsigned char aControlByte );
 			void playbackFunction();
 			
 			int recieveMessageFromServer( int aSize = sizeof( PacketStructures::NetworkMessage ), void *aAddressPtr = NULL )
@@ -111,13 +112,19 @@ namespace Networking
 			
 			int queueMessagesFromServer();
 			int checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket );
+			void getExpectedPacketValues(	MESSAGEPACKET aMessagePacket,
+											Networking::trackid_t *aTrackID,
+											Networking::sampleid_t *aSampleID,
+											Networking::sampleid_t *aBufferRangeStartID,
+											Networking::sampleid_t *aBufferRangeEndID,
+											timeval *aTimeoutStartTime = NULL );
 			
 		private:
 		
 			int cSocketData, cSocketFlags;
 			
 			struct sockaddr_in cServer;
-			struct hostent *cHp;
+			struct hostent *cHostEntry;
 			
 			char cBroadcastIP[SIZE_OF_IP_INET_ADDRESSES], cLocalIP[SIZE_OF_IP_INET_ADDRESSES];
 			
@@ -127,7 +134,8 @@ namespace Networking
 			std::list<MESSAGEPACKET> cVolumeMessageList, cVolumeMessageListExtraPackets;
 			std::queue<PacketStructures::NetworkMessage> cNetworkMessageQueue;
 			
-			
+			bool cPlay, cPause;
+			//boost::mutex cPlaybackLock;
 			
 			MESSAGEPACKET cIncomingMessage;
 			

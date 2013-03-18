@@ -26,10 +26,19 @@ namespace Networking
 	*/
 	PlaybackClient::PlaybackClient( char *aHostName, char *aPortNumber, float aXPosition, float aYPosition )
 		: 	cXPosition( aXPosition ),
-			cYPosition( aYPosition )
+			cYPosition( aYPosition ),
+			cPlay( false ),
+			cPause( false )
 		{
-		Logger::openLogFile();
+		timeval mTimeval;
+		gettimeofday(&mTimeval, 0);
+		time_t curtime = mTimeval.tv_sec;
+		tm *mTimePtr = localtime(&curtime);
+		char mTempBuffer[100];
+		sprintf( mTempBuffer, "LogFileClient:%02d:%02d:%02d:%03d", mTimePtr->tm_hour, mTimePtr->tm_min, mTimePtr->tm_sec, mTimeval.tv_usec );
+		Logger::openLogFile( mTempBuffer, true );
 		Logger::logNotice( "Starting playback client" );
+		Logger::logNotice( "Startup Time in seconds: %d", mTimeval.tv_sec );
 		
 		cSocketData = socket( AF_INET, SOCK_DGRAM, 0 );
 		cServer.sin_family = AF_INET;
@@ -38,22 +47,25 @@ namespace Networking
 		Get local machine info
 		*/
 		/******************************Needs Work******************************/
-		//Need to figure out how to get a local ip address
+		//Need to figure out how to get a non local ip address
 		gethostname( cBroadcastIP, SIZE_OF_IP_INET_ADDRESSES );
 		Logger::logNotice( "----UDPClient1 running at host NAME: %s", cBroadcastIP );
-		cHp = gethostbyname( cBroadcastIP );
-		memcpy( &( cServer.sin_addr ), cHp->h_addr, cHp->h_length );
+		cHostEntry = gethostbyname( cBroadcastIP );
+		memcpy( &( cServer.sin_addr ), cHostEntry->h_addr, cHostEntry->h_length );
 		Logger::logNotice( "(UDPClient1 INET ADDRESS is: %s )", inet_ntoa( cServer.sin_addr ) );
 		strncpy( cLocalIP, inet_ntoa( cServer.sin_addr ), SIZE_OF_IP_INET_ADDRESSES );
+		//Temporary until I find a way to get non local ip address
+		strncpy( cBroadcastIP, inet_ntoa( cServer.sin_addr ), SIZE_OF_IP_INET_ADDRESSES );
 
 		/*
 		Segmentation fault will occur with bad aHostName
 		*/
-		cHp = gethostbyname( aHostName );
-		memcpy( &(cServer.sin_addr.s_addr), cHp->h_addr, cHp->h_length);
+		cHostEntry = gethostbyname( aHostName );
+		memcpy( &(cServer.sin_addr.s_addr), cHostEntry->h_addr, cHostEntry->h_length);
 		cServer.sin_port = htons( atoi( aPortNumber ) );
 		
 		/*
+		connectToServer();
 		cListenerThread = new boost::thread( boost::bind ( &Networking::PlaybackClient::listenerFunction, this ) );
 		playbackFunction();
 		g++ PlaybackClient.cpp -lboost_thread-mt
@@ -100,7 +112,7 @@ namespace Networking
 					}
 				}
 			
-			Logger::logNotice( "Server response to NEW_CONNECTION timed out." );
+			Logger::logWarning( "Server response to NEW_CONNECTION timed out." );
 			}while( 1 );		
 		}
 	
@@ -129,6 +141,37 @@ namespace Networking
 				}
 			}while( 1 );
 		}
+	
+	/*
+	Changes class state variables cPlay and Cpause based on the type of control byte passed in
+	*/
+	void PlaybackClient::changePlaybackStatus(  const unsigned char aControlByte )
+		{
+		switch( aControlByte )
+			{
+			case ControlBytes::BEGIN_PLAYBACK:
+					{
+					//boost::mutex::scoped_lock lock( cPlaybackLock );
+					cPlay = true;
+					Logger::logNotice( "Started audio playback."  );
+					}
+				break;
+			case ControlBytes::STOP_PLAYBACK:
+					{
+					//boost::mutex::scoped_lock lock( cPlaybackLock );
+					cPlay = false;
+					Logger::logNotice( "Stopped audio playback."  );
+					}
+				break;
+			case ControlBytes::PAUSE_PLAYBACK:
+					{
+					//boost::mutex::scoped_lock lock( cPlaybackLock );
+					cPause = ( cPause ) ? false : true;
+					( cPause ) ? Logger::logNotice( "Paused audio playback."  ) : Logger::logNotice( "Unpaused audio playback."  );
+					}
+				break;
+			}
+		}
 		
 	void PlaybackClient::playbackFunction()
 		{
@@ -156,7 +199,7 @@ namespace Networking
 					{
 					Logger::logNotice( "Recieved exit message from server. Exiting playback client." );
 					Logger::closeLogFile();
-					exit( 1 );
+					exit( ControlBytes::DISCONNECT );
 					}
 
 				cNetworkMessageQueue.pop();
@@ -234,7 +277,6 @@ namespace Networking
 	*/
 	int PlaybackClient::queueMessagesFromServer()
 		{
-		static bool mNotFinished;
 		static MESSAGEPACKET *mPlaceHolder, mTempNetworkPacket;
 		static PacketStructures::NetworkMessage mTempNetworkMessage;
 		
@@ -245,80 +287,89 @@ namespace Networking
 			}
 				
 		
-		mNotFinished = false;
 		mPlaceHolder = &cIncomingMessage;
-		do
-			{
-			switch( mPlaceHolder->messageHeader.ControlByte )
-				{
-				case ControlBytes::DISCONNECT:
-					exit( ControlBytes::DISCONNECT );
-					
-				case ControlBytes::SENDING_AUDIO:
-				case ControlBytes::SENDING_VOLUME:
-					Logger::logNotice( "Received an Audio/Volume packet." );
-					
-					recieveMessageFromServer( mPlaceHolder->messageHeader.Extra._dataLength, mPlaceHolder->data );
-					memcpy( &mTempNetworkPacket, mPlaceHolder, 
-							sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
-					checkForDroppedPacketsAndAddPacketToList( mTempNetworkPacket );
-					break;
-				
-				case ControlBytes::BEGIN_PLAYBACK:
-				case ControlBytes::STOP_PLAYBACK:
-				case ControlBytes::PAUSE_PLAYBACK:
-					Logger::logNotice( "Received a TransportControl packet." );
-					
-					/******************************Needs Work******************************/
-					//Need to actually write a function to handle begin, stop, and pause playback
-					sendMessageToServer( mPlaceHolder->messageHeader.ControlByte, 
-										0, 0, 0, 0, //placeholders to get to last field
-										mPlaceHolder->messageHeader.TransportControl.requestID );
-					break;
-					
-				default:
-					Logger::logNotice( "Received a network message packet." );
-					
-					memcpy( &mTempNetworkMessage, mPlaceHolder, sizeof( PacketStructures::NetworkMessage ) );
-					cNetworkMessageQueue.push( mTempNetworkMessage );
-				}
-				
-			}while( mNotFinished );
 		
-		return 0;
+		switch( mPlaceHolder->messageHeader.ControlByte )
+			{
+			case ControlBytes::DISCONNECT:
+				exit( ControlBytes::DISCONNECT );
+				
+			case ControlBytes::SENDING_AUDIO:
+			case ControlBytes::SENDING_VOLUME:
+				Logger::logNotice( "Received an Audio/Volume packet." );
+				
+				recieveMessageFromServer( mPlaceHolder->messageHeader.Extra._dataLength, mPlaceHolder->data );
+				memcpy( &mTempNetworkPacket, mPlaceHolder, 
+						sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
+				checkForDroppedPacketsAndAddPacketToList( mTempNetworkPacket );
+				break;
+			
+			case ControlBytes::BEGIN_PLAYBACK:
+			case ControlBytes::STOP_PLAYBACK:
+			case ControlBytes::PAUSE_PLAYBACK:
+				Logger::logNotice( "Received a TransportControl packet." );
+				
+				changePlaybackStatus( mPlaceHolder->messageHeader.ControlByte );
+				sendMessageToServer( mPlaceHolder->messageHeader.ControlByte, 
+									0, 0, 0, 0, //placeholders to get to last field
+									mPlaceHolder->messageHeader.TransportControl.requestID );
+				break;
+				
+			default:
+				Logger::logNotice( "Received a network message packet." );
+				
+				memcpy( &mTempNetworkMessage, mPlaceHolder, sizeof( PacketStructures::NetworkMessage ) );
+				cNetworkMessageQueue.push( mTempNetworkMessage );
+			}
+		
+		return 1;
 		}
 		
 	int PlaybackClient::checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket )
 		{
 		static int mAudioPacketCounter = 0, mVolumePacketCounter = 0;
-		/******************************Needs Work******************************/
-		
+		static timeval mAudioTimeoutStartTime, mVolumeTimeoutStartTime, mCurrentTime;
+		static Networking::trackid_t mNextAudioTrackID = -1, mNextVolumeTrackID = -1;
+		static Networking::sampleid_t mNextAudioSampleID = -1, mNextAudioBufferRangeStartID = -1, mNextAudioBufferRangeEndID = -1;
+		static Networking::sampleid_t mNextVolumeSampleID = -1, mNextVolumeBufferRangeStartID = -1, mNextVolumeBufferRangeEndID = -1;
+			
 		switch( aMessagePacket.messageHeader.ControlByte )
 			{
-			//cAudioMessageListExtraPackets
 			case ControlBytes::SENDING_AUDIO:
-				if( cAudioMessageList.empty() )
+				if( mNextAudioTrackID == -1 )
 					{
 					mAudioPacketCounter = 0;
+					getExpectedPacketValues( aMessagePacket, &mNextAudioTrackID, &mNextAudioSampleID, 
+											&mNextAudioBufferRangeStartID, &mNextAudioBufferRangeEndID );
 					cAudioMessageList.push_back( aMessagePacket );
+					
 					}
-				else if( aMessagePacket.messageHeader.AudioSample.SampleID == cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+				else if( aMessagePacket.messageHeader.AudioSample.SampleID == mNextAudioSampleID
+						&& aMessagePacket.messageHeader.AudioSample.TrackID == mNextAudioTrackID )
 					{
 					mAudioPacketCounter = 0;
+					getExpectedPacketValues( aMessagePacket, &mNextAudioTrackID, &mNextAudioSampleID, 
+											&mNextAudioBufferRangeStartID, &mNextAudioBufferRangeEndID );
 					cAudioMessageList.push_back( aMessagePacket );
 					
 					cAudioMessageListExtraPackets.sort();
 					while( !cAudioMessageListExtraPackets.empty() )
 						{
 						if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
-								< cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+								< mNextAudioSampleID || mNextAudioTrackID > 
+								cAudioMessageListExtraPackets.front().messageHeader.AudioSample.TrackID )
 							{
 							cAudioMessageListExtraPackets.pop_front();
 							}
 						else if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
-								== cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1 )
+								==  mNextAudioSampleID && mNextAudioTrackID ==
+								cAudioMessageListExtraPackets.front().messageHeader.AudioSample.TrackID )
 							{
+							getExpectedPacketValues( cAudioMessageListExtraPackets.front(), &mNextAudioTrackID, &mNextAudioSampleID, 
+													&mNextAudioBufferRangeStartID, &mNextAudioBufferRangeEndID );
+							
 							cAudioMessageList.push_back( cAudioMessageListExtraPackets.front() );
+							
 							cAudioMessageListExtraPackets.pop_front();
 							}
 						else
@@ -332,41 +383,62 @@ namespace Networking
 					mAudioPacketCounter++;
 					cAudioMessageListExtraPackets.push_back( aMessagePacket );
 					}
-				
-				if( mAudioPacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS )
+			
+				if( mNextAudioTrackID != -1 )
 					{
-					sendMessageToServer( ControlBytes::RESEND_AUDIO,
-										cAudioMessageList.back().messageHeader.AudioSample.TrackID,
-										cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1,
-										cAudioMessageList.back().messageHeader.AudioSample.BufferRangeStartID,
-										cAudioMessageList.back().messageHeader.AudioSample.BufferRangeEndID );	
+					gettimeofday( &mCurrentTime, 0 );
+					
+					if( mAudioPacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS
+						|| ( mCurrentTime.tv_sec - mAudioTimeoutStartTime.tv_sec ) * 1000 
+						+ ( mCurrentTime.tv_usec - mAudioTimeoutStartTime.tv_usec ) / 1000 
+						> PACKETRECEIPTTIMEOUT ) 
+						{
+						sendMessageToServer( ControlBytes::RESEND_AUDIO,
+											cAudioMessageList.back().messageHeader.AudioSample.TrackID,
+											cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1,
+											cAudioMessageList.back().messageHeader.AudioSample.BufferRangeStartID,
+											cAudioMessageList.back().messageHeader.AudioSample.BufferRangeEndID );	
+						Logger::logNotice( "Sent a RESEND_AUDIO packet to server." );					
+						}
 					}
 				
-				Logger::logNotice( "Sent a RESEND_AUDIO packet to server." );
 				break;
 			
 			default:
-				if( cVolumeMessageList.empty() )
+				if( mNextVolumeTrackID == -1 )
 					{
 					mVolumePacketCounter = 0;
+					getExpectedPacketValues( aMessagePacket, &mNextVolumeTrackID, &mNextVolumeSampleID, 
+											&mNextVolumeBufferRangeStartID, &mNextVolumeBufferRangeEndID );
 					cVolumeMessageList.push_back( aMessagePacket );
+					
 					}
-				else if( aMessagePacket.messageHeader.VolumeSample.SampleID == cVolumeMessageList.back().messageHeader.VolumeSample.SampleID + 1 )
+				else if( aMessagePacket.messageHeader.VolumeSample.SampleID == mNextVolumeSampleID
+						&& aMessagePacket.messageHeader.VolumeSample.TrackID == mNextVolumeTrackID )
 					{
 					mVolumePacketCounter = 0;
+					getExpectedPacketValues( aMessagePacket, &mNextVolumeTrackID, &mNextVolumeSampleID, 
+											&mNextVolumeBufferRangeStartID, &mNextVolumeBufferRangeEndID );
 					cVolumeMessageList.push_back( aMessagePacket );
+					
 					cVolumeMessageListExtraPackets.sort();
 					while( !cVolumeMessageListExtraPackets.empty() )
 						{
 						if( cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
-								< cVolumeMessageList.back().messageHeader.VolumeSample.SampleID + 1 )
+								< mNextVolumeSampleID || mNextVolumeTrackID > 
+								cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.TrackID )
 							{
 							cVolumeMessageListExtraPackets.pop_front();
 							}
-						else if( cAudioMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
-								== cVolumeMessageList.back().messageHeader.VolumeSample.SampleID + 1 )
+						else if( cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
+								==  mNextVolumeSampleID && mNextVolumeTrackID ==
+								cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.TrackID )
 							{
-							cVolumeMessageList.push_back( cAudioMessageListExtraPackets.front() );
+							getExpectedPacketValues( cVolumeMessageListExtraPackets.front(), &mNextVolumeTrackID, &mNextVolumeSampleID, 
+													&mNextVolumeBufferRangeStartID, &mNextVolumeBufferRangeEndID );
+							
+							cVolumeMessageList.push_back( cVolumeMessageListExtraPackets.front() );
+							
 							cVolumeMessageListExtraPackets.pop_front();
 							}
 						else
@@ -380,22 +452,55 @@ namespace Networking
 					mVolumePacketCounter++;
 					cVolumeMessageListExtraPackets.push_back( aMessagePacket );
 					}
-				
-				if( mVolumePacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS )
+			
+				if( mNextVolumeTrackID != -1 )
 					{
-					sendMessageToServer( ControlBytes::RESEND_VOLUME,
-										cAudioMessageList.back().messageHeader.VolumeSample.TrackID,
-										cAudioMessageList.back().messageHeader.VolumeSample.SampleID + 1,
-										cAudioMessageList.back().messageHeader.VolumeSample.BufferRangeStartID,
-										cAudioMessageList.back().messageHeader.VolumeSample.BufferRangeEndID );
+					gettimeofday( &mCurrentTime, 0 );
+					
+					if( mVolumePacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS
+						|| ( mCurrentTime.tv_sec - mVolumeTimeoutStartTime.tv_sec ) * 1000 
+						+ ( mCurrentTime.tv_usec - mVolumeTimeoutStartTime.tv_usec ) / 1000 
+						> PACKETRECEIPTTIMEOUT ) 
+						{
+						sendMessageToServer( ControlBytes::RESEND_AUDIO,
+											cVolumeMessageList.back().messageHeader.VolumeSample.TrackID,
+											cVolumeMessageList.back().messageHeader.VolumeSample.SampleID + 1,
+											cVolumeMessageList.back().messageHeader.VolumeSample.BufferRangeStartID,
+											cVolumeMessageList.back().messageHeader.VolumeSample.BufferRangeEndID );	
+						Logger::logNotice( "Sent a RESEND_Volume packet to server." );					
+						}
 					}
 				
-				Logger::logNotice( "Sent a RESEND_VOLUME packet to server." );
+				break;
 			}
 		
 		return 0;
 		}
-
+		
+	void PlaybackClient::getExpectedPacketValues(	MESSAGEPACKET aMessagePacket,
+													Networking::trackid_t *aTrackID,
+													Networking::sampleid_t *aSampleID,
+													Networking::sampleid_t *aBufferRangeStartID,
+													Networking::sampleid_t *aBufferRangeEndID,
+													timeval *aTimeoutStartTime )
+		{
+			
+		if( aMessagePacket.messageHeader.AudioSample.SampleID + 1 <= aMessagePacket.messageHeader.AudioSample.BufferRangeEndID )
+			{
+			*aTrackID = aMessagePacket.messageHeader.AudioSample.SampleID;
+			*aSampleID = aMessagePacket.messageHeader.AudioSample.SampleID + 1;
+			*aBufferRangeStartID = aMessagePacket.messageHeader.AudioSample.BufferRangeStartID;
+			*aBufferRangeEndID = aMessagePacket.messageHeader.AudioSample.BufferRangeEndID;
+			gettimeofday( aTimeoutStartTime, 0 );
+			}
+		else
+			{
+			*aTrackID = -1;
+			*aSampleID = -1;
+			*aBufferRangeStartID = -1;
+			*aBufferRangeEndID = -1;
+			}
+		}
 	}
 	
 int main( int argc, char **argv )
