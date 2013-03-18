@@ -3,6 +3,7 @@
 #include "../pap-file-io/Logger.h"
 #include "NetworkStructures.h"
 #include "Socket.h"
+#include <fcntl.h>
 #include <queue>
 #include <list>
 #include <iostream>
@@ -11,11 +12,11 @@
 #include <string.h>
 #include <queue>
 #include <sys/time.h>
-/*
+
 #include <boost/thread.hpp>  
 #include <boost/date_time.hpp>
 #include <boost/bind.hpp>
-*/
+
 #define PACKETRECEIPTTIMEOUT 2000
 #define NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS 5
 #define SIZE_OF_PAYLOAD 1468
@@ -89,7 +90,7 @@ namespace Networking
 	class PlaybackClient 
 		{
 		public:
-			PlaybackClient( char *aHostName, char *aPortNumber, float aXPosition, float aYPosition );
+			PlaybackClient( char *aHostName, char *aPortNumber, float aXPosition, float aYPosition, char *aIPAddress = NULL );
 			~PlaybackClient(){}
 			void connectToServer();
 			void checkInWithServer();
@@ -135,11 +136,11 @@ namespace Networking
 			std::queue<PacketStructures::NetworkMessage> cNetworkMessageQueue;
 			
 			bool cPlay, cPause;
-			//boost::mutex cPlaybackLock;
+			boost::mutex cPlaybackLock;
 			
 			MESSAGEPACKET cIncomingMessage;
 			
-			//boost::thread *cListenerThread;
+			boost::thread *cListenerThread, *cPlaybackThread;
 		};
 	}
 

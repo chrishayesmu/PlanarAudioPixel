@@ -24,7 +24,7 @@ namespace Networking
 	/*
 	PlaybackClient constructor just sets up udp stuff
 	*/
-	PlaybackClient::PlaybackClient( char *aHostName, char *aPortNumber, float aXPosition, float aYPosition )
+	PlaybackClient::PlaybackClient( char *aHostName, char *aPortNumber, float aXPosition, float aYPosition, char *aIPAddress )
 		: 	cXPosition( aXPosition ),
 			cYPosition( aYPosition ),
 			cPlay( false ),
@@ -41,6 +41,7 @@ namespace Networking
 		Logger::logNotice( "Startup Time in seconds: %d", mTimeval.tv_sec );
 		
 		cSocketData = socket( AF_INET, SOCK_DGRAM, 0 );
+		fcntl( cSocketData, F_SETFL, O_NONBLOCK );
 		cServer.sin_family = AF_INET;
 		
 		/*
@@ -55,7 +56,8 @@ namespace Networking
 		Logger::logNotice( "(UDPClient1 INET ADDRESS is: %s )", inet_ntoa( cServer.sin_addr ) );
 		strncpy( cLocalIP, inet_ntoa( cServer.sin_addr ), SIZE_OF_IP_INET_ADDRESSES );
 		//Temporary until I find a way to get non local ip address
-		strncpy( cBroadcastIP, inet_ntoa( cServer.sin_addr ), SIZE_OF_IP_INET_ADDRESSES );
+		strncpy( cBroadcastIP, aIPAddress, SIZE_OF_IP_INET_ADDRESSES );
+		Logger::logNotice( "Client IP Address: %s", cBroadcastIP );
 
 		/*
 		Segmentation fault will occur with bad aHostName
@@ -64,12 +66,11 @@ namespace Networking
 		memcpy( &(cServer.sin_addr.s_addr), cHostEntry->h_addr, cHostEntry->h_length);
 		cServer.sin_port = htons( atoi( aPortNumber ) );
 		
-		/*
+		
 		connectToServer();
 		cListenerThread = new boost::thread( boost::bind ( &Networking::PlaybackClient::listenerFunction, this ) );
+		//cPlaybackThread = new boost::thread( boost::bind ( &Networking::PlaybackClient::playbackFunction, this ) );
 		playbackFunction();
-		g++ PlaybackClient.cpp -lboost_thread-mt
-		*/
 		}
 		
 	/*
@@ -81,7 +82,7 @@ namespace Networking
 	*/
 	void PlaybackClient::connectToServer() 
 		{
-		int mRecieve;
+		int mRecieve = -1;
 		timeval mTimeoutTime, mCurrentTime;
 		Logger::logNotice( "Connecting to server" );
 		
@@ -121,7 +122,7 @@ namespace Networking
 		int mNewMessages;
 		timeval mCheckInTime, mCurrentTime;
 		gettimeofday( &mCheckInTime, 0 );
-		
+				
 		do
 			{
 			gettimeofday( &mCurrentTime, 0 );
@@ -133,7 +134,6 @@ namespace Networking
 				Logger::logNotice( "PERIODIC_CHECK_IN packet sent" );
 				gettimeofday( &mCheckInTime, 0 );
 				}
-			
 			mNewMessages = queueMessagesFromServer();
 			if( mNewMessages != 0 )
 				{
@@ -151,21 +151,21 @@ namespace Networking
 			{
 			case ControlBytes::BEGIN_PLAYBACK:
 					{
-					//boost::mutex::scoped_lock lock( cPlaybackLock );
+					boost::mutex::scoped_lock lock( cPlaybackLock );
 					cPlay = true;
 					Logger::logNotice( "Started audio playback."  );
 					}
 				break;
 			case ControlBytes::STOP_PLAYBACK:
 					{
-					//boost::mutex::scoped_lock lock( cPlaybackLock );
+					boost::mutex::scoped_lock lock( cPlaybackLock );
 					cPlay = false;
 					Logger::logNotice( "Stopped audio playback."  );
 					}
 				break;
 			case ControlBytes::PAUSE_PLAYBACK:
 					{
-					//boost::mutex::scoped_lock lock( cPlaybackLock );
+					boost::mutex::scoped_lock lock( cPlaybackLock );
 					cPause = ( cPause ) ? false : true;
 					( cPause ) ? Logger::logNotice( "Paused audio playback."  ) : Logger::logNotice( "Unpaused audio playback."  );
 					}
@@ -179,16 +179,18 @@ namespace Networking
 			{
 			/******************************Needs Work******************************/
 			//Waiting for Chris' stuff
+			//Right now this logic would have raped the server with audio/volume resend requests or broke my logic, probably the latter
+			//Need to fine tune my code to handle emptied queues, for now I'm taking it out. Left the comments for convenient testing later
 			if( !cAudioMessageList.empty() )
 				{
-				Logger::logNotice( "Handled an Audio message."  );
-				cAudioMessageList.pop_front();
+				Logger::logNotice( "There are some Audio messages, I should probably do something about those."  );
+				//cAudioMessageList.pop_front();
 				}
 			
 			if( !cVolumeMessageList.empty() )
 				{
-				Logger::logNotice( "Handled a Volume message."  );
-				cVolumeMessageList.pop_front();
+				Logger::logNotice( "There are some Volume messages, I should probably do something about those."  );
+				//cVolumeMessageList.pop_front();
 				}
 			
 			if( !cNetworkMessageQueue.empty() )
@@ -204,7 +206,7 @@ namespace Networking
 
 				cNetworkMessageQueue.pop();
 				}
-			
+			sleep( 1 ); //only in here for testing purposes so we don't blow up logfiles
 			}while( 1 );
 		}
 	
@@ -505,16 +507,16 @@ namespace Networking
 	
 int main( int argc, char **argv )
 		{
-		if( argc != 5 )
+		if( argc != 6 )
 			{
 			std::cout << "\nError:Incorrect usage\n" << std::endl;
-			std::cout << argv[0] << " <server IP address> <server port #> <client x position> <client y position>" << std::endl;
-			std::cout << "\ni.e.\n" << argv[0] << " 127.0.1.1 2222 5.2 8.3\n" << std::endl;
+			std::cout << argv[0] << " <server IP address> <server port #> <client x position> <client y position> <client IP Address>" << std::endl;
+			std::cout << "\ni.e.\n\n" << argv[0] << " 127.0.1.1 2222 5.2 8.3 72.161.218.139\n" << std::endl;
 			return -1;
 			}
 		
 		
-		Networking::PlaybackClient mPlaybackClient( argv[1], argv[2], atof( argv[3] ), atof( argv[4] ) );
+		Networking::PlaybackClient mPlaybackClient( argv[1], argv[2], atof( argv[3] ), atof( argv[4] ), argv[5] );
 		
 		return 0;
 		}
