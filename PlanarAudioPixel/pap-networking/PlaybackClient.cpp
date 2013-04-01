@@ -28,7 +28,17 @@ namespace Networking
 		: 	cXPosition( aXPosition ),
 			cYPosition( aYPosition ),
 			cPlay( false ),
-			cPause( false )
+			cPause( false ),
+			cAudioPacketCounter( 0 ),
+			cVolumePacketCounter( 0 ),
+			cNextAudioTrackID( -1 ),
+			cNextVolumeTrackID( -1 ),
+			cNextAudioSampleID( -1 ),
+			cNextAudioBufferRangeStartID( -1 ),
+			cNextAudioBufferRangeEndID( -1 ),
+			cNextVolumeSampleID( -1 ),
+			cNextVolumeBufferRangeStartID( -1 ),
+			cNextVolumeBufferRangeEndID( -1 )			
 		{
 		timeval mTimeval;
 		gettimeofday(&mTimeval, 0);
@@ -83,7 +93,7 @@ namespace Networking
 	void PlaybackClient::connectToServer() 
 		{
 		int mRecieve = -1;
-		timeval mTimeoutTime, mCurrentTime;
+		timeval mTimeoutTime, cCurrentTime;
 		Logger::logNotice( "Connecting to server" );
 		
 		do
@@ -92,15 +102,17 @@ namespace Networking
 			sendMessageToServer( ControlBytes::NEW_CONNECTION );
 			
 			gettimeofday( &mTimeoutTime, 0 );
-			gettimeofday( &mCurrentTime, 0 );
+			gettimeofday( &cCurrentTime, 0 );
 			
-			while( ( mCurrentTime.tv_sec - mTimeoutTime.tv_sec ) * 1000 + ( mCurrentTime.tv_usec - mTimeoutTime.tv_usec ) / 1000 
+			while( ( cCurrentTime.tv_sec - mTimeoutTime.tv_sec ) * 1000 + ( cCurrentTime.tv_usec - mTimeoutTime.tv_usec ) / 1000 
 					< PACKETRECEIPTTIMEOUT )
 				{
 				if( ( mRecieve = recieveMessageFromServer() ) != -1 )
 					{
 					break;
 					}
+				
+				gettimeofday( &cCurrentTime, 0 );
 				}
 				
 			if( mRecieve != -1 )
@@ -120,13 +132,19 @@ namespace Networking
 	void PlaybackClient::listenerFunction()
 		{
 		int mNewMessages;
-		timeval mCheckInTime, mCurrentTime;
+		timeval mCheckInTime, cCurrentTime;
 		gettimeofday( &mCheckInTime, 0 );
 				
 		do
 			{
-			gettimeofday( &mCurrentTime, 0 );
-			if( ( mCurrentTime.tv_sec - mCheckInTime.tv_sec ) * 1000 + ( mCurrentTime.tv_usec - mCheckInTime.tv_usec ) / 1000 
+			/*
+			All of the Timeout stuff together.
+			I probably don't need to keep calling gettimeofday() as it happens so close together, but as we're
+				aiming for time precision, I did it nonetheless.
+			*/
+			
+			gettimeofday( &cCurrentTime, 0 );
+			if( ( cCurrentTime.tv_sec - mCheckInTime.tv_sec ) * 1000 + ( cCurrentTime.tv_usec - mCheckInTime.tv_usec ) / 1000 
 					> CLIENT_CHECKIN_DELAY )
 				{
 				Logger::logNotice( "Initiating periodic check in with server" );
@@ -134,6 +152,45 @@ namespace Networking
 				Logger::logNotice( "PERIODIC_CHECK_IN packet sent" );
 				gettimeofday( &mCheckInTime, 0 );
 				}
+			
+			gettimeofday( &cCurrentTime, 0 );
+			if( ( cCurrentTime.tv_sec - cAudioTimeoutStartTime.tv_sec ) * 1000 
+			      + ( cCurrentTime.tv_usec - cAudioTimeoutStartTime.tv_usec ) / 1000 
+				  > PACKETRECEIPTTIMEOUT && cNextAudioTrackID != -1 )
+				{
+				int mTimeOut = ( cCurrentTime.tv_sec - cAudioTimeoutStartTime.tv_sec ) * 1000 
+								 + ( cCurrentTime.tv_usec - cAudioTimeoutStartTime.tv_usec ) / 1000;
+								 
+				sendMessageToServer( ControlBytes::RESEND_AUDIO, cNextAudioTrackID, cNextAudioSampleID,
+									 cNextAudioBufferRangeStartID, cNextAudioBufferRangeEndID );
+				
+				Logger::logWarning( "---AUDIOPACKET TIMEOUT---" );
+				Logger::logNotice( "Timeout: %d - AudioPacketCounter: %d", mTimeOut, cAudioPacketCounter );
+				Logger::logNotice( "Sent a RESEND_AUDIO packet to server." );
+				Logger::logWarning( "Resetting timeout" );
+				
+				gettimeofday( &cAudioTimeoutStartTime, 0 );
+				}
+				
+			gettimeofday( &cCurrentTime, 0 );
+			if( ( cCurrentTime.tv_sec - cVolumeTimeoutStartTime.tv_sec ) * 1000 
+			      + ( cCurrentTime.tv_usec - cVolumeTimeoutStartTime.tv_usec ) / 1000 
+				  > PACKETRECEIPTTIMEOUT && cNextVolumeTrackID != -1 )
+				{
+				int mTimeOut = ( cCurrentTime.tv_sec - cVolumeTimeoutStartTime.tv_sec ) * 1000 
+								 + ( cCurrentTime.tv_usec - cVolumeTimeoutStartTime.tv_usec ) / 1000;
+								 
+				sendMessageToServer( ControlBytes::RESEND_VOLUME, cNextVolumeTrackID, cNextVolumeSampleID,
+									 cNextVolumeBufferRangeStartID, cNextVolumeBufferRangeEndID );
+				
+				Logger::logWarning( "---VOLUMEPACKET TIMEOUT---" );
+				Logger::logNotice( "Timeout: %d - VolumePacketCounter: %d", mTimeOut, cVolumePacketCounter );
+				Logger::logNotice( "Sent a RESEND_VOLUME packet to server." );
+				Logger::logWarning( "Resetting timeout" );
+				
+				gettimeofday( &cVolumeTimeoutStartTime, 0 );
+				}
+			
 			mNewMessages = queueMessagesFromServer();
 			if( mNewMessages != 0 )
 				{
@@ -197,13 +254,6 @@ namespace Networking
 				{
 				Logger::logNotice( "Handled a Network message."  );
 				
-				if( cNetworkMessageQueue.front().ControlByte == ControlBytes::DISCONNECT )
-					{
-					Logger::logNotice( "Recieved exit message from server. Exiting playback client." );
-					Logger::closeLogFile();
-					exit( ControlBytes::DISCONNECT );
-					}
-
 				cNetworkMessageQueue.pop();
 				}
 			sleep( 1 ); //only in here for testing purposes so we don't blow up logfiles
@@ -294,6 +344,8 @@ namespace Networking
 		switch( mPlaceHolder->messageHeader.ControlByte )
 			{
 			case ControlBytes::DISCONNECT:
+				Logger::logNotice( "Recieved ControlBytes::DISCONNECT packet from server. Exiting playback client." );
+				Logger::closeLogFile();
 				exit( ControlBytes::DISCONNECT );
 				
 			case ControlBytes::SENDING_AUDIO:
@@ -329,46 +381,54 @@ namespace Networking
 		
 	int PlaybackClient::checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket )
 		{
-		static int mAudioPacketCounter = 0, mVolumePacketCounter = 0;
-		static timeval mAudioTimeoutStartTime, mVolumeTimeoutStartTime, mCurrentTime;
-		static Networking::trackid_t mNextAudioTrackID = -1, mNextVolumeTrackID = -1;
-		static Networking::sampleid_t mNextAudioSampleID = -1, mNextAudioBufferRangeStartID = -1, mNextAudioBufferRangeEndID = -1;
-		static Networking::sampleid_t mNextVolumeSampleID = -1, mNextVolumeBufferRangeStartID = -1, mNextVolumeBufferRangeEndID = -1;
-			
 		switch( aMessagePacket.messageHeader.ControlByte )
 			{
 			case ControlBytes::SENDING_AUDIO:
-				if( mNextAudioTrackID == -1 )
+				if( cNextAudioTrackID == -1 )
 					{
-					mAudioPacketCounter = 0;
-					getExpectedPacketValues( aMessagePacket, &mNextAudioTrackID, &mNextAudioSampleID, 
-											&mNextAudioBufferRangeStartID, &mNextAudioBufferRangeEndID );
+					Logger::logNotice( "Successfully added an audio packet to queue when queue WAS empty" );
+					Logger::logNotice( "SampleID: %d - cNextAudioSampleID: %d", aMessagePacket.messageHeader.AudioSample.SampleID, cNextAudioSampleID );
+					Logger::logNotice( "TrackID: %d - cNextAudioTrackID: %d", aMessagePacket.messageHeader.AudioSample.TrackID, cNextAudioTrackID );
+					
+					cAudioPacketCounter = 0;
+					gettimeofday( &cAudioTimeoutStartTime, 0 );
+					
+					getExpectedPacketValues( aMessagePacket, &cNextAudioTrackID, &cNextAudioSampleID, 
+											&cNextAudioBufferRangeStartID, &cNextAudioBufferRangeEndID );
 					cAudioMessageList.push_back( aMessagePacket );
 					
 					}
-				else if( aMessagePacket.messageHeader.AudioSample.SampleID == mNextAudioSampleID
-						&& aMessagePacket.messageHeader.AudioSample.TrackID == mNextAudioTrackID )
+				else if( aMessagePacket.messageHeader.AudioSample.SampleID == cNextAudioSampleID
+						&& aMessagePacket.messageHeader.AudioSample.TrackID == cNextAudioTrackID )
 					{
-					mAudioPacketCounter = 0;
-					getExpectedPacketValues( aMessagePacket, &mNextAudioTrackID, &mNextAudioSampleID, 
-											&mNextAudioBufferRangeStartID, &mNextAudioBufferRangeEndID );
+					Logger::logNotice( "Successfully added an audio packet to queue when queue wasn't empty" );
+					Logger::logNotice( "SampleID: %d - cNextAudioSampleID: %d", aMessagePacket.messageHeader.AudioSample.SampleID, cNextAudioSampleID );
+					Logger::logNotice( "TrackID: %d - cNextAudioTrackID: %d", aMessagePacket.messageHeader.AudioSample.TrackID, cNextAudioTrackID );
+					
+					cAudioPacketCounter = 0;
+					gettimeofday( &cAudioTimeoutStartTime, 0 );
+					
+					getExpectedPacketValues( aMessagePacket, &cNextAudioTrackID, &cNextAudioSampleID, 
+											&cNextAudioBufferRangeStartID, &cNextAudioBufferRangeEndID );
 					cAudioMessageList.push_back( aMessagePacket );
 					
 					cAudioMessageListExtraPackets.sort();
 					while( !cAudioMessageListExtraPackets.empty() )
 						{
 						if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
-								< mNextAudioSampleID || mNextAudioTrackID > 
+								< cNextAudioSampleID || cNextAudioTrackID > 
 								cAudioMessageListExtraPackets.front().messageHeader.AudioSample.TrackID )
 							{
+							Logger::logWarning( "I Poppped the Front of my extra audio list" );
 							cAudioMessageListExtraPackets.pop_front();
 							}
 						else if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
-								==  mNextAudioSampleID && mNextAudioTrackID ==
+								==  cNextAudioSampleID && cNextAudioTrackID ==
 								cAudioMessageListExtraPackets.front().messageHeader.AudioSample.TrackID )
 							{
-							getExpectedPacketValues( cAudioMessageListExtraPackets.front(), &mNextAudioTrackID, &mNextAudioSampleID, 
-													&mNextAudioBufferRangeStartID, &mNextAudioBufferRangeEndID );
+							Logger::logWarning( "I put the front of my extra list into the back of my regular list" );
+							getExpectedPacketValues( cAudioMessageListExtraPackets.front(), &cNextAudioTrackID, &cNextAudioSampleID, 
+													&cNextAudioBufferRangeStartID, &cNextAudioBufferRangeEndID );
 							
 							cAudioMessageList.push_back( cAudioMessageListExtraPackets.front() );
 							
@@ -376,30 +436,40 @@ namespace Networking
 							}
 						else
 							{
+							Logger::logWarning( "List from front to back" );
+							while( !cAudioMessageListExtraPackets.empty() )
+								{
+								Logger::logWarning( "Audiotrack: %d - AudioSample: %d",
+													cAudioMessageListExtraPackets.front().messageHeader.AudioSample.TrackID,
+													cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID );
+								cAudioMessageListExtraPackets.pop_front();
+								}
+							Logger::logWarning( "I BROKE UNDER THE PRESSURE" );
 							break;
 							}
 						}
 					}
 				else
 					{
-					mAudioPacketCounter++;
+					Logger::logNotice( "---Failed to add to queue---" );
+					Logger::logNotice( "SampleID: %d - cNextAudioSampleID: %d", aMessagePacket.messageHeader.AudioSample.SampleID, cNextAudioSampleID );
+					Logger::logNotice( "TrackID: %d - cNextAudioTrackID: %d", aMessagePacket.messageHeader.AudioSample.TrackID, cNextAudioTrackID );
+					Logger::logNotice( "---Failed to add to queue---" );
+					
+					cAudioPacketCounter++;
 					cAudioMessageListExtraPackets.push_back( aMessagePacket );
 					}
 			
-				if( mNextAudioTrackID != -1 )
+				if( cNextAudioTrackID != -1 )
 					{
-					gettimeofday( &mCurrentTime, 0 );
 					
-					if( mAudioPacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS
-						|| ( mCurrentTime.tv_sec - mAudioTimeoutStartTime.tv_sec ) * 1000 
-						+ ( mCurrentTime.tv_usec - mAudioTimeoutStartTime.tv_usec ) / 1000 
-						> PACKETRECEIPTTIMEOUT ) 
+					if( cAudioPacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS ) 
 						{
-						sendMessageToServer( ControlBytes::RESEND_AUDIO,
-											cAudioMessageList.back().messageHeader.AudioSample.TrackID,
-											cAudioMessageList.back().messageHeader.AudioSample.SampleID + 1,
-											cAudioMessageList.back().messageHeader.AudioSample.BufferRangeStartID,
-											cAudioMessageList.back().messageHeader.AudioSample.BufferRangeEndID );	
+						sendMessageToServer( ControlBytes::RESEND_AUDIO, cNextAudioTrackID, cNextAudioSampleID,
+											 cNextAudioBufferRangeStartID, cNextAudioBufferRangeEndID );
+						
+						Logger::logWarning( "Too many packets have arrived out of order, need to initiate AUDIORESEND" );
+						Logger::logNotice( "AudioPacketCounter: %d", cAudioPacketCounter );
 						Logger::logNotice( "Sent a RESEND_AUDIO packet to server." );					
 						}
 					}
@@ -407,37 +477,51 @@ namespace Networking
 				break;
 			
 			default:
-				if( mNextVolumeTrackID == -1 )
+				if( cNextVolumeTrackID == -1 )
 					{
-					mVolumePacketCounter = 0;
-					getExpectedPacketValues( aMessagePacket, &mNextVolumeTrackID, &mNextVolumeSampleID, 
-											&mNextVolumeBufferRangeStartID, &mNextVolumeBufferRangeEndID );
+					Logger::logNotice( "Successfully added an audio packet to queue when queue WAS empty" );
+					Logger::logNotice( "SampleID: %d - cNextVolumeSampleID: %d", aMessagePacket.messageHeader.VolumeSample.SampleID, cNextVolumeSampleID );
+					Logger::logNotice( "TrackID: %d - cNextVolumeTrackID: %d", aMessagePacket.messageHeader.VolumeSample.TrackID, cNextVolumeTrackID );
+					
+					cVolumePacketCounter = 0;
+					gettimeofday( &cVolumeTimeoutStartTime, 0 );
+					
+					getExpectedPacketValues( aMessagePacket, &cNextVolumeTrackID, &cNextVolumeSampleID, 
+											&cNextVolumeBufferRangeStartID, &cNextVolumeBufferRangeEndID );
 					cVolumeMessageList.push_back( aMessagePacket );
 					
 					}
-				else if( aMessagePacket.messageHeader.VolumeSample.SampleID == mNextVolumeSampleID
-						&& aMessagePacket.messageHeader.VolumeSample.TrackID == mNextVolumeTrackID )
+				else if( aMessagePacket.messageHeader.VolumeSample.SampleID == cNextVolumeSampleID
+						&& aMessagePacket.messageHeader.VolumeSample.TrackID == cNextVolumeTrackID )
 					{
-					mVolumePacketCounter = 0;
-					getExpectedPacketValues( aMessagePacket, &mNextVolumeTrackID, &mNextVolumeSampleID, 
-											&mNextVolumeBufferRangeStartID, &mNextVolumeBufferRangeEndID );
+					Logger::logNotice( "Successfully added an Volume packet to queue when queue wasn't empty" );
+					Logger::logNotice( "SampleID: %d - cNextVolumeSampleID: %d", aMessagePacket.messageHeader.VolumeSample.SampleID, cNextVolumeSampleID );
+					Logger::logNotice( "TrackID: %d - cNextVolumeTrackID: %d", aMessagePacket.messageHeader.VolumeSample.TrackID, cNextVolumeTrackID );
+					
+					cVolumePacketCounter = 0;
+					gettimeofday( &cVolumeTimeoutStartTime, 0 );
+					
+					getExpectedPacketValues( aMessagePacket, &cNextVolumeTrackID, &cNextVolumeSampleID, 
+											&cNextVolumeBufferRangeStartID, &cNextVolumeBufferRangeEndID );
 					cVolumeMessageList.push_back( aMessagePacket );
 					
 					cVolumeMessageListExtraPackets.sort();
 					while( !cVolumeMessageListExtraPackets.empty() )
 						{
 						if( cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
-								< mNextVolumeSampleID || mNextVolumeTrackID > 
+								< cNextVolumeSampleID || cNextVolumeTrackID > 
 								cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.TrackID )
 							{
+							Logger::logWarning( "I Poppped the Front of my extra Volume list" );
 							cVolumeMessageListExtraPackets.pop_front();
 							}
 						else if( cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
-								==  mNextVolumeSampleID && mNextVolumeTrackID ==
+								==  cNextVolumeSampleID && cNextVolumeTrackID ==
 								cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.TrackID )
 							{
-							getExpectedPacketValues( cVolumeMessageListExtraPackets.front(), &mNextVolumeTrackID, &mNextVolumeSampleID, 
-													&mNextVolumeBufferRangeStartID, &mNextVolumeBufferRangeEndID );
+							Logger::logWarning( "I put the front of my extra list into the back of my regular list" );
+							getExpectedPacketValues( cVolumeMessageListExtraPackets.front(), &cNextVolumeTrackID, &cNextVolumeSampleID, 
+													&cNextVolumeBufferRangeStartID, &cNextVolumeBufferRangeEndID );
 							
 							cVolumeMessageList.push_back( cVolumeMessageListExtraPackets.front() );
 							
@@ -445,31 +529,41 @@ namespace Networking
 							}
 						else
 							{
+							Logger::logWarning( "List from front to back" );
+							while( !cVolumeMessageListExtraPackets.empty() )
+								{
+								Logger::logWarning( "Volumetrack: %d - VolumeSample: %d",
+													cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.TrackID,
+													cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID );
+								cVolumeMessageListExtraPackets.pop_front();
+								}
+							Logger::logWarning( "I BROKE UNDER THE PRESSURE" );
 							break;
 							}
 						}
 					}
 				else
 					{
-					mVolumePacketCounter++;
+					Logger::logNotice( "---Failed to add to queue---" );
+					Logger::logNotice( "SampleID: %d - cNextVolumeSampleID: %d", aMessagePacket.messageHeader.VolumeSample.SampleID, cNextVolumeSampleID );
+					Logger::logNotice( "TrackID: %d - cNextVolumeTrackID: %d", aMessagePacket.messageHeader.VolumeSample.TrackID, cNextVolumeTrackID );
+					Logger::logNotice( "---Failed to add to queue---" );
+					
+					cVolumePacketCounter++;
 					cVolumeMessageListExtraPackets.push_back( aMessagePacket );
 					}
 			
-				if( mNextVolumeTrackID != -1 )
+				if( cNextVolumeTrackID != -1 )
 					{
-					gettimeofday( &mCurrentTime, 0 );
 					
-					if( mVolumePacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS
-						|| ( mCurrentTime.tv_sec - mVolumeTimeoutStartTime.tv_sec ) * 1000 
-						+ ( mCurrentTime.tv_usec - mVolumeTimeoutStartTime.tv_usec ) / 1000 
-						> PACKETRECEIPTTIMEOUT ) 
+					if( cVolumePacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS ) 
 						{
-						sendMessageToServer( ControlBytes::RESEND_AUDIO,
-											cVolumeMessageList.back().messageHeader.VolumeSample.TrackID,
-											cVolumeMessageList.back().messageHeader.VolumeSample.SampleID + 1,
-											cVolumeMessageList.back().messageHeader.VolumeSample.BufferRangeStartID,
-											cVolumeMessageList.back().messageHeader.VolumeSample.BufferRangeEndID );	
-						Logger::logNotice( "Sent a RESEND_Volume packet to server." );					
+						sendMessageToServer( ControlBytes::RESEND_VOLUME, cNextVolumeTrackID, cNextVolumeSampleID,
+											 cNextVolumeBufferRangeStartID, cNextVolumeBufferRangeEndID );
+						
+						Logger::logWarning( "Too many packets have arrived out of order, need to initiate VolumeRESEND" );
+						Logger::logNotice( "VolumePacketCounter: %d", cVolumePacketCounter );
+						Logger::logNotice( "Sent a RESEND_VOLUME packet to server." );					
 						}
 					}
 				
@@ -487,10 +581,10 @@ namespace Networking
 													timeval *aTimeoutStartTime )
 		{
 			
-		if( aMessagePacket.messageHeader.AudioSample.SampleID + 1 <= aMessagePacket.messageHeader.AudioSample.BufferRangeEndID )
+		if( aMessagePacket.messageHeader.AudioSample.TrackID + 1 <= aMessagePacket.messageHeader.AudioSample.BufferRangeEndID )
 			{
-			*aTrackID = aMessagePacket.messageHeader.AudioSample.SampleID;
-			*aSampleID = aMessagePacket.messageHeader.AudioSample.SampleID + 1;
+			*aTrackID = aMessagePacket.messageHeader.AudioSample.TrackID + 1;
+			*aSampleID = aMessagePacket.messageHeader.AudioSample.SampleID;
 			*aBufferRangeStartID = aMessagePacket.messageHeader.AudioSample.BufferRangeStartID;
 			*aBufferRangeEndID = aMessagePacket.messageHeader.AudioSample.BufferRangeEndID;
 			gettimeofday( aTimeoutStartTime, 0 );
@@ -505,18 +599,28 @@ namespace Networking
 		}
 	}
 	
+void handleCtrlCSignal( int aPlaceholder )
+	{
+	Logger::logWarning( "Closed by a Ctrl-C signal" );
+	Logger::closeLogFile();
+	exit( SIGINT );
+	}
+	
 int main( int argc, char **argv )
+	{
+	if( argc != 6 )
 		{
-		if( argc != 6 )
-			{
-			std::cout << "\nError:Incorrect usage\n" << std::endl;
-			std::cout << argv[0] << " <server IP address> <server port #> <client x position> <client y position> <client IP Address>" << std::endl;
-			std::cout << "\ni.e.\n\n" << argv[0] << " 127.0.1.1 2222 5.2 8.3 72.161.218.139\n" << std::endl;
-			return -1;
-			}
-		
-		
-		Networking::PlaybackClient mPlaybackClient( argv[1], argv[2], atof( argv[3] ), atof( argv[4] ), argv[5] );
-		
-		return 0;
+		std::cout << "\nError:Incorrect usage\n" << std::endl;
+		std::cout << argv[0] << " <server IP address> <server port #> <client x position> <client y position> <client IP Address>" << std::endl;
+		std::cout << "\ni.e.\n\n" << argv[0] << " 127.0.1.1 2222 5.2 8.3 72.161.218.139\n" << std::endl;
+		std::cout << "\ni.e.\n\n" << argv[0] << " 127.0.0.1 4688 5.2 8.3 127.0.0.1\n" << std::endl;
+
+		return -1;
 		}
+	
+	signal( SIGINT, handleCtrlCSignal );
+	Networking::PlaybackClient mPlaybackClient( argv[1], argv[2], atof( argv[3] ), atof( argv[4] ), argv[5] );
+	
+	return 0;
+	}
+	

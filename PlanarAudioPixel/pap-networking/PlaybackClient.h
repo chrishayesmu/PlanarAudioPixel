@@ -7,6 +7,7 @@
 #include <queue>
 #include <list>
 #include <iostream>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,31 +43,6 @@ namespace Networking
 			case ControlBytes::SENDING_AUDIO:
 				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
 					{
-					return messagePacket1.messageHeader.AudioSample.TrackID > messagePacket2.messageHeader.AudioSample.TrackID;
-					}
-				else
-					{
-					return messagePacket1.messageHeader.AudioSample.SampleID > messagePacket2.messageHeader.AudioSample.SampleID;
-					}
-			default:
-				if( messagePacket1.messageHeader.VolumeSample.TrackID != messagePacket2.messageHeader.VolumeSample.TrackID )
-					{
-					return messagePacket1.messageHeader.VolumeSample.TrackID > messagePacket2.messageHeader.VolumeSample.TrackID;
-					}
-				else
-					{
-					return messagePacket1.messageHeader.VolumeSample.SampleID > messagePacket2.messageHeader.VolumeSample.SampleID;
-					}
-			}
-		}
-	
-	bool operator > ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 )
-		{
-		switch( messagePacket1.messageHeader.ControlByte )
-			{
-			case ControlBytes::SENDING_AUDIO:
-				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
-					{
 					return messagePacket1.messageHeader.AudioSample.TrackID < messagePacket2.messageHeader.AudioSample.TrackID;
 					}
 				else
@@ -81,6 +57,31 @@ namespace Networking
 				else
 					{
 					return messagePacket1.messageHeader.VolumeSample.SampleID < messagePacket2.messageHeader.VolumeSample.SampleID;
+					}
+			}
+		}
+	
+	bool operator > ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 )
+		{
+		switch( messagePacket1.messageHeader.ControlByte )
+			{
+			case ControlBytes::SENDING_AUDIO:
+				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
+					{
+					return messagePacket1.messageHeader.AudioSample.TrackID > messagePacket2.messageHeader.AudioSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.AudioSample.SampleID > messagePacket2.messageHeader.AudioSample.SampleID;
+					}
+			default:
+				if( messagePacket1.messageHeader.VolumeSample.TrackID != messagePacket2.messageHeader.VolumeSample.TrackID )
+					{
+					return messagePacket1.messageHeader.VolumeSample.TrackID > messagePacket2.messageHeader.VolumeSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.VolumeSample.SampleID > messagePacket2.messageHeader.VolumeSample.SampleID;
 					}
 			}
 		}
@@ -141,6 +142,12 @@ namespace Networking
 			MESSAGEPACKET cIncomingMessage;
 			
 			boost::thread *cListenerThread, *cPlaybackThread;
+			
+			int cAudioPacketCounter, cVolumePacketCounter;
+			timeval cAudioTimeoutStartTime, cVolumeTimeoutStartTime, cCurrentTime;
+			Networking::trackid_t cNextAudioTrackID, cNextVolumeTrackID;
+			Networking::sampleid_t cNextAudioSampleID, cNextAudioBufferRangeStartID, cNextAudioBufferRangeEndID;
+			Networking::sampleid_t cNextVolumeSampleID, cNextVolumeBufferRangeStartID, cNextVolumeBufferRangeEndID;
 		};
 	}
 
