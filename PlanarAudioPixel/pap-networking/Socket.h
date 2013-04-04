@@ -1,9 +1,12 @@
 #pragma once
 
 #ifndef RASPBERRY_PI
+
 #include <winsock2.h>
 #include <WS2tcpip.h>
+
 #else
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>

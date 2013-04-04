@@ -156,7 +156,7 @@ namespace Logger
 
 		// Retrieve the time then convert it into a date
 		time_t curTime;
-		time(&curTime);
+		curTime = time(NULL);
 		tm* curDate = localtime(&curTime);
 
 		// Format the date appropriately

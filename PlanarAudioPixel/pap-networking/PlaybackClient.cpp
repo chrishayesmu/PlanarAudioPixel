@@ -1,3 +1,5 @@
+#ifdef RASPBERRY_PI
+
 #include "PlaybackClient.h"
 #include "Socket.h"
 #include "NetworkGlobals.h"
@@ -623,4 +625,5 @@ int main( int argc, char **argv )
 	
 	return 0;
 	}
-	
+
+#endif

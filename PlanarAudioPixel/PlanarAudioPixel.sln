@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlaybackServerTest", "Playb
 		{3AE7C63F-72CB-44ED-B82E-1B5F926B5679} = {3AE7C63F-72CB-44ED-B82E-1B5F926B5679}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pap-test-server", "pap-test-server\pap-test-server.vcxproj", "{D59F456E-E74F-46D6-AA67-AADF85FF330A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -116,6 +118,7 @@ Global
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Win32.ActiveCfg = Debug|Any CPU
+		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|Win32.Build.0 = Debug|Any CPU
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|x86.ActiveCfg = Debug|x86
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Debug|x86.Build.0 = Debug|x86
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -125,6 +128,20 @@ Global
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|Win32.ActiveCfg = Release|Any CPU
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|x86.ActiveCfg = Release|x86
 		{CE7DC5A3-B09D-4FD7-8993-31449A6E96FD}.Release|x86.Build.0 = Release|x86
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Debug|Win32.Build.0 = Debug|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Debug|x86.ActiveCfg = Debug|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Debug|x86.Build.0 = Debug|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Release|Any CPU.ActiveCfg = Release|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Release|Win32.ActiveCfg = Release|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Release|Win32.Build.0 = Release|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Release|x86.ActiveCfg = Release|Win32
+		{D59F456E-E74F-46D6-AA67-AADF85FF330A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

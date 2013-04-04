@@ -19,8 +19,21 @@ namespace PlaybackServerTest
 
         private void trackAdded(int audioCode, int positionCode)
         {
-            MessageBox.Show("Trackz: " + audioCode.ToString() + " " + positionCode);
+            MessageBox.Show("Tracks: " + audioCode.ToString() + " " + positionCode);
         }
+        private void clientConnected(PlanarAudioPixel.Client client)
+        {
+            MessageBox.Show("" + client.ClientID + "(" + client.Offset.x + ", " + client.Offset.y + ")");
+        }
+        private void clientDisconnected(PlanarAudioPixel.Client client)
+        {
+            MessageBox.Show("" + client.ClientID);
+        }
+        private void clientCheckin(PlanarAudioPixel.Client client)
+        {
+            listBox1.Items.Add("" + client.ClientID);
+        }
+        
 
         public Form1()
         {
@@ -34,6 +47,10 @@ namespace PlaybackServerTest
             {
                 playbackServer.ServerStart();
                 MessageBox.Show("Server started successfully!");
+
+                playbackServer.OnClientConnected(clientConnected);
+                playbackServer.OnClientDisconnected(clientDisconnected);
+                playbackServer.OnClientCheckIn(clientCheckin);
             }
             catch (Exception ex)
             {

@@ -1,5 +1,5 @@
-#ifndef RASPBERRY_PI
-#define RASPBERRY_PI
+#ifdef RASPBERRY_PI
+
 #include "../pap-file-io/Logger.h"
 #include "NetworkStructures.h"
 #include "Socket.h"

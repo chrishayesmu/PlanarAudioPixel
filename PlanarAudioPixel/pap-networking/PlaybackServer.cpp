@@ -513,7 +513,9 @@ namespace Networking {
 						//If the time between check-ins exceeds CLIENT_CHECKIN_DELAY milliseconds, drop the client
 						if ((cTime - i->second.LastCheckInTime) / 1000 > CLIENT_CHECKIN_DELAY) {
 
-							Logger::logWarning("A client has timed out and been disconnected; GUID: %s", i->second.ClientID);
+							char guid[128];
+							formatGUIDAsString(guid, i->second.ClientID);
+							Logger::logWarning("A client has timed out and been disconnected; GUID: %s", guid);
 
 							this->sendDisconnect(i->second.ClientID);
 							clientDropList.push_back(i->second.ClientID);
