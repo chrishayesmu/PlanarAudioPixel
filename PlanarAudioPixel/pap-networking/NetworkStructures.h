@@ -12,6 +12,7 @@
 #include "ControlByteConstants.h"
 #include <stdint.h>
 #include <time.h>
+#include "sockets.h"
 
 namespace Networking
 {
@@ -50,22 +51,7 @@ namespace Networking
 	// A structure for representing a client's globally unique ID (GUID). This 
 	// structure is mostly used for creating a mapping to clients for the
 	// Client Information Table.
-	struct ClientGUID
-	{
-		union {
-			struct {
-				IP_Address BroadcastIP;
-				IP_Address LocalIP;
-			};
-			#ifndef RASPBERRY_PI
-			unsigned __int64 ID;
-			#else
-			uint64_t ID;
-			#endif
-		};
-
-		bool operator < (const ClientGUID& ID) const;
-	};
+	typedef uint32_t ClientGUID;
 
 	/// <summary>Formats a ClientGUID object into a string. The string will be "x.x.x.x x.x.x.x", where the first
 	/// quartet is the broadcast IP and the second quartet is the local IP.</summary>
@@ -77,24 +63,14 @@ namespace Networking
 	// Defined in section 3.1 of the PAP document.
 	struct Client
 	{
-		// A union combining the BroadcastIP and LocalIP as a ClientGUID.
-		union {
-			struct {
-				// The broadcast IP of the client, generally the IP of the client's router or network switch.
-				IP_Address BroadcastIP;
-
-				// The local IP of the client, generally the internal IP of the client on its network.
-				IP_Address LocalIP;
-			};
-			ClientGUID ClientID;
-		};
+		ClientGUID ClientID;
 
 		// The client's position in the grid, stored as an offset from the top-left corner of the grid,
 		// which has position (0, 0).
 		PositionInfo Offset;
 
-		// The 8-byte Unix timestamp of when the client last checked in with the server.
-		time_t LastCheckInTime;
+		// The associated TCP socket
+		_socket* s;
 	};
 
 	typedef uint32_t trackid_t;
@@ -165,24 +141,24 @@ namespace Networking
 	
 	namespace PacketStructures {
 
-		// [24] A struct for specifying the volume of two clients for a volume data message.
+		// [16] A struct for specifying the volume of two clients for a volume data message.
 		//		Two clients are packed into this struct to align on an 8-byte boundary and
 		//		save 4 bytes per client while still maintaining a simple programming paradigm.
 	/*
-	2>  class ClientVolume	size(24):
+	2>  class ClientVolume	size(16):
 	2>  	+---
 	2>   0	| ClientGUID clientID_1
-	2>   8	| float		 clientVolume_1
-	2>  12	| float		 clientVolume_2
-	2>  16	| ClientGUID clientID_2
+	2>   4	| float		 clientVolume_1
+	2>   8	| float		 clientVolume_2
+	2>  12	| ClientGUID clientID_2
 	2>  	+---
 	*/
 		struct ClientVolume 
 		{
-			/* [8] */ ClientGUID clientID_1;
+			/* [4] */ ClientGUID clientID_1;
 			/* [4] */ float  clientVolume_1;
 			/* [4] */ float  clientVolume_2;
-			/* [8] */ ClientGUID clientID_2;
+			/* [4] */ ClientGUID clientID_2;
 		};
 
 		// [32] Represents a network packet.
@@ -198,7 +174,8 @@ namespace Networking
 				// [16] Client to Server - Connection notification
 				struct {
 					// The ID and position of the client
-					/* [8] */ ClientGUID clientID;
+					/* [4] */ ClientGUID clientID;
+								uint32_t _client_pad;
 					/* [8] */ PositionInfo position;
 				} ClientConnection;
 
@@ -206,6 +183,7 @@ namespace Networking
 				struct {
 					// The ID and position of the client
 					/* [8] */ ClientGUID clientID;
+								uint32_t _client_pad;
 					/* [8] */ PositionInfo position;
 				} ClientCheckIn;
 				
@@ -253,6 +231,7 @@ namespace Networking
 					//Client to Server - Acknowledgement
 					struct {
 						/* [8] */ ClientGUID clientID;
+								uint32_t _client_pad;
 						#ifndef RASPBERRY_PI
 						/* [8] */ requestid_t requestID;
 						#else
@@ -264,7 +243,7 @@ namespace Networking
 				// [16] Server to Client - Disconnect message
 				struct {
 					/* [8] */ ClientGUID clientID;
-					/* [8] explicit padding */ unsigned char _pad[8];
+					/* [8] explicit padding */ unsigned char _pad[12];
 				} DisconnectNotification;
 
 			};

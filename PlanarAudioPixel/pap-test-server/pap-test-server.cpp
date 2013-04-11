@@ -8,6 +8,8 @@
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+		WSADATA wsaData;
+	WSAStartup(MAKEWORD(2,2), &wsaData);
 
 	Networking::PlaybackServer* server;
 	printf("Error code: %d\n", Networking::PlaybackServer::Create(&server));

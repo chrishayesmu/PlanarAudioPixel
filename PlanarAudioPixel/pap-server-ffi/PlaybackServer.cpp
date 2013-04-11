@@ -14,9 +14,7 @@ namespace PlanarAudioPixel {
 
 	static void clientConnectedChain(Networking::Client c) {
 		Client clientChain;
-		clientChain.ClientID.BroadcastIP.RawIP = c.ClientID.BroadcastIP.RawIP;
-		clientChain.ClientID.LocalIP.RawIP = c.ClientID.LocalIP.RawIP;
-		clientChain.LastCheckInTime = c.LastCheckInTime;
+		clientChain.ClientID.LocalIP.RawIP = c.ClientID;
 		clientChain.Offset.x = c.Offset.x;
 		clientChain.Offset.y = c.Offset.y;
 
@@ -24,30 +22,13 @@ namespace PlanarAudioPixel {
 			PlaybackServer::_ClientConnectedCallbacks[i]->Invoke(clientChain);
 	}
 
-	static void clientDisconnectedChain(Networking::Client c) {
+	static void clientDisconnectedChain(Networking::ClientGUID c) {
 		Client clientChain;
-		clientChain.ClientID.BroadcastIP.RawIP = c.ClientID.BroadcastIP.RawIP;
-		clientChain.ClientID.LocalIP.RawIP = c.ClientID.LocalIP.RawIP;
-		clientChain.LastCheckInTime = c.LastCheckInTime;
-		clientChain.Offset.x = c.Offset.x;
-		clientChain.Offset.y = c.Offset.y;
+		clientChain.ClientID.LocalIP.RawIP = c;
 
 		for (int i = 0; i < PlaybackServer::_ClientConnectedCallbacks->Count; ++i)
 			PlaybackServer::_ClientDisconnectedCallbacks[i]->Invoke(clientChain);
 	}
-
-	static void clientCheckInChain(Networking::Client c) {
-		Client clientChain;
-		clientChain.ClientID.BroadcastIP.RawIP = c.ClientID.BroadcastIP.RawIP;
-		clientChain.ClientID.LocalIP.RawIP = c.ClientID.LocalIP.RawIP;
-		clientChain.LastCheckInTime = c.LastCheckInTime;
-		clientChain.Offset.x = c.Offset.x;
-		clientChain.Offset.y = c.Offset.y;
-
-		for (int i = 0; i < PlaybackServer::_ClientConnectedCallbacks->Count; ++i)
-			PlaybackServer::_ClientCheckInCallbacks[i]->Invoke(clientChain);
-	}
-
 
 	///<summary>Constructs a playback server foreign function interface class.</summary>
 	PlaybackServer::PlaybackServer(){
@@ -59,7 +40,6 @@ namespace PlanarAudioPixel {
 
 		server->OnClientConnected(&clientConnectedChain);
 		server->OnClientDisconnected(&clientDisconnectedChain);
-		server->OnClientCheckIn(&clientCheckInChain);
 
 		this->server = server;
 

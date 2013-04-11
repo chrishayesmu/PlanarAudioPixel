@@ -28,7 +28,6 @@ namespace PlanarAudioPixel {
 	public value class ClientGUID
 	{
 	public:
-		IP_Address BroadcastIP;
 		IP_Address LocalIP;
 	};
 
@@ -44,8 +43,6 @@ namespace PlanarAudioPixel {
 		// which has position (0, 0).
 		PositionInfo Offset;
 
-		// The 8-byte Unix timestamp of when the client last checked in with the server.
-		time_t LastCheckInTime;
 	};
 
 }

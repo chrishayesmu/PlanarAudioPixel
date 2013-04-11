@@ -1,6 +1,9 @@
 #include "NetworkStructures.h"
 #include "Socket.h"
+#include "sockets.h"
 #include <queue>
+
+#define close _close
 //Giancarlo
 
 namespace Networking {
@@ -34,8 +37,7 @@ namespace Networking {
 	/// Public typedefs for callback functions
 	typedef void (*AddTrackCallback)(int audioCode, int positionCode, uint64_t token);
 	typedef void (*ClientConnectedCallback)(Client c);
-	typedef void (*ClientDisconnectedCallback)(Client c);
-	typedef void (*ClientCheckInCallback)(Client c);
+	typedef void (*ClientDisconnectedCallback)(ClientGUID c);
 
 	///<summary>A class that handles networking and audio data for managing a set of speaker nodes.</summary>
 	class PlaybackServer {
@@ -91,8 +93,8 @@ namespace Networking {
 		CRITICAL_SECTION controlMessagesCriticalSection;
 		HANDLE controlMessagesResourceCount;
 
-		// Main receiving and sending socket
-		Socket* recvSocket, * sendSocket;
+		// Main server socket
+		_socket* serverSocket;
 
 		// Maintains the servers current state. Initial state is STOPPED.
 		PlaybackServerState state;
@@ -116,58 +118,17 @@ namespace Networking {
 		// Track buffer object
 		TrackBuffer tracks;
 
-		// Used to ensure delivery of the initial buffering samples
-		typedef std::map<sampleid_t,  bool>::iterator BufferingIterator;
-		std::map<sampleid_t, bool> samplesResend;
-		std::map<sampleid_t, bool> volumesResend;
-		bool initialBuffering;
-
-		// Used to ensure transport controls are processed
-		requestid_t currentRequestID;
-		typedef std::map<requestid_t, std::map<ClientGUID, bool>>::iterator AcknowledgementIterator;
-		typedef std::map<ClientGUID, bool>::iterator ClientAcknowledgementIterator;
-		
-		//requestid_t -> (ClientGUID -> bool)
-		std::map<requestid_t, std::map<ClientGUID, bool>> requestsAcknowledged;
-		CRITICAL_SECTION requestsAcknowledgedCriticalSection;
-
-		// Maintains a list of resend requests so that the network doesn't get spammed with resending the same sample
-		typedef std::map<trackid_t, std::map<sampleid_t, time_t>>::iterator ResendRequestIterator;
-		std::map<trackid_t, std::map<sampleid_t, time_t>> sampleResendRequests;
-		std::map<trackid_t, std::map<sampleid_t, time_t>> volumeResendRequests;
+		// Clients
+		typedef std::map<ClientGUID, Client>::iterator ClientIterator;
+		std::map<ClientGUID, Client> clients;
 
 		// Callback subscriptions
 		std::vector<ClientConnectedCallback> clientConnectedCallbacks;
 		std::vector<ClientDisconnectedCallback> clientDisconnectedCallbacks;
-		std::vector<ClientCheckInCallback> clientCheckInCallbacks;
 
 		//Construction/destruction
 		PlaybackServer();
 		~PlaybackServer();
-
-		///<summary>Receives information from a client and stores it in the client information list.</summary>
-		///<param name="data">The message data.</param>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void receiveClientConnection(const PacketStructures::NetworkMessage* message, int dataSize);
-
-		///<summary>Responds to an audio data resend request.</summary>
-		///<param name="data">The message data.</summary>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void resendAudio(const PacketStructures::NetworkMessage* message, int dataSize);
-
-		///<summary>Responds to a volume data resend request.</summary>
-		///<param name="data">The message data.</summary>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void resendVolume(const PacketStructures::NetworkMessage* message, int dataSize);
-
-		///<summary>Updates the client information table for the client that sent the check in.</summary>
-		///<param name="data">The message data.</summary>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void receiveClientCheckIn(const PacketStructures::NetworkMessage* message, int dataSize);
-
-		///<summary>This function will be called in order to notify the server that one or more 
-		/// clients have moved, join, or dropped out, and that the volume must therefore be recalculated.</summary>
-		void clientPositionsChanged();
 
 		///<summary>Reads audio data from the file and fills an AudioBuffer.</summary>
 		///<param name="filename">The name of the audio file.</param>
@@ -203,16 +164,13 @@ namespace Networking {
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
 		void sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID);
 
+		void broadcastMessage(const void* __restrict data, int size);
+
 		///<summary>Sends a disconnect packet to a particular client.</summary>
-		///<param name="clientID">The ID of the client to which this message applies</param>
-		void sendDisconnect(ClientGUID clientID);
+		///<param name="index">The ID of the client to drop.</param>
+		void sendDisconnect(ClientGUID ID);
 		
-		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
-		///<param name="datagram">The network message.</param>
-		///<param name="datagramSize">The size of the datagram.</param>
-		void dispatchNetworkMessage(const PacketStructures::NetworkMessage* message, int datagramSize);
-		
-		///<summary>Handles network communications and hands off incoming packets to dispatchNetworkMessage().</summary>
+		///<summary>Handles network communications.</summary>
 		void serverReceive();
 		///<summary>Multithreaded router function that calls serverReceieve().</summary>
 		static DWORD __stdcall serverRouteReceive(void* server);
@@ -277,8 +235,5 @@ namespace Networking {
 		///<param name="callback">A pointer to the function to call when the event is raised.</param>
 		void OnClientDisconnected(ClientDisconnectedCallback callback);
 
-		///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
-		///<param name="callback">A pointer to the function to call when the event is raised.</param>
-		void OnClientCheckIn(ClientCheckInCallback callback);
 	};
 };

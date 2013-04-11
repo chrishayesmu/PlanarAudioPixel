@@ -9,6 +9,8 @@
 #include <map>
 #include "NetworkStructures.h"
 
+#ifndef RASPBERRI_PI
+
 namespace Networking
 {
 	// A map between client GUIDs and the client information structures. Should be
@@ -35,3 +37,5 @@ namespace Networking
 	// Performs a spin wait for the specified number of microseconds. Exact microsecond accuracy is not super important here.
 	void busyWait(time_t us);
 }
+
+#endif

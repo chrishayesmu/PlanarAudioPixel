@@ -36,6 +36,9 @@
     <ClInclude Include="PlaybackClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="sockets.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Socket.cpp">
@@ -51,6 +54,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PlaybackClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sockets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

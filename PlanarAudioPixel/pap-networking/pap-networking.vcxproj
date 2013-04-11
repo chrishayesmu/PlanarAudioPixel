@@ -72,6 +72,7 @@
     <ClInclude Include="PlaybackClient.h" />
     <ClInclude Include="PlaybackServer.h" />
     <ClInclude Include="Socket.h" />
+    <ClInclude Include="sockets.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="NetworkGlobals.cpp" />
@@ -79,6 +80,7 @@
     <ClCompile Include="PlaybackServer.cpp" />
     <ClCompile Include="Socket.cpp" />
     <ClCompile Include="PlaybackClient.cpp" />
+    <ClCompile Include="sockets.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="NetworkSpecs.txt" />

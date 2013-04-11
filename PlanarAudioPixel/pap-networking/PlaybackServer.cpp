@@ -9,142 +9,6 @@
 
 namespace Networking {
 		
-		///<summary>Receives information from a client and stores it in the client information list.</summary>
-		///<param name="message">The message data.</param>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::receiveClientConnection(const PacketStructures::NetworkMessage* message, int dataSize) {
-			
-			//Build the client
-			Client client;
-			client.ClientID = message->ClientConnection.clientID;
-			client.Offset = message->ClientConnection.position;
-			client.LastCheckInTime = getMicroseconds();
-			
-			//If the client doesn't exist, fire the ClientConnected event
-			if (Networking::ClientInformationTable.find(client.ClientID) == Networking::ClientInformationTable.end()) {
-				for (int i = 0; i < this->clientConnectedCallbacks.size(); ++i) {
-					this->clientConnectedCallbacks[i](client);
-				}
-			}
-
-			//Add the client to the information table
-			Networking::ClientInformationTable[client.ClientID] = client;
-
-			//Send the acknowledgement to the client
-			PacketStructures::NetworkMessage connectionAcknowledgement;
-			connectionAcknowledgement.ControlByte = ControlBytes::NEW_CONNECTION;
-			this->sendSocket->SendMessage((char*)&connectionAcknowledgement, sizeof(PacketStructures::NetworkMessage));
-
-			Logger::logNotice("Client connected (GUID: %c-%c-%c-%c %c-%c-%c-%c)", client.BroadcastIP.Byte1, client.BroadcastIP.Byte2,
-																				  client.BroadcastIP.Byte3, client.BroadcastIP.Byte4,
-																				  client.LocalIP.Byte1,     client.LocalIP.Byte2,
-																				  client.LocalIP.Byte3,     client.LocalIP.Byte4);
-		}
-
-		///<summary>Updates the client information table for the client that sent the check in.</summary>
-		///<param name="message">The message data.</param>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::receiveClientCheckIn(const PacketStructures::NetworkMessage* message, int dataSize) {
-			
-			//Clients that haven't formally connected and maintained a connection shouldn't be checking in.
-			if (Networking::ClientInformationTable.find(message->ClientCheckIn.clientID) == Networking::ClientInformationTable.end()) 
-				return;
-
-			//Update the timestamp
-			Networking::ClientInformationTable[message->ClientConnection.clientID].LastCheckInTime = getMicroseconds();
-
-			//Raise the ClientCheckIn event
-			for (int i = 0; i < this->clientCheckInCallbacks.size(); ++i) {
-				this->clientCheckInCallbacks[i](Networking::ClientInformationTable[message->ClientConnection.clientID]);
-			}
-
-			ClientGUID clientID = message->ClientConnection.clientID;
-
-			char clientIDasString[32];
-			formatGUIDAsString(clientIDasString, clientID);
-			Logger::logNotice("Client checked in (GUID: %s)", clientIDasString);
-
-			//Check if the client's position changed
-			float oldX = Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.x;
-			float oldY = Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.y;
-			float newX = message->ClientCheckIn.position.x;
-			float newY = message->ClientCheckIn.position.y;
-
-			if (newX != oldX || newY != oldY)
-			{
-				Logger::logWarning("Client (GUID: %s) moved from (%f, %f) to (%f, %f)", clientIDasString, oldX, oldY, newX, newY);
-
-				Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.x = newX;
-				Networking::ClientInformationTable[message->ClientConnection.clientID].Offset.y = newY;
-				this->clientPositionsChanged();
-			}
-		}
-
-		///<summary>Responds to an audio data resend request.</summary>
-		///<param name="message">The message data.</param>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::resendAudio(const PacketStructures::NetworkMessage* message, int dataSize) {
-
-			Logger::logWarning("Received an audio resend request");
-
-			//Drop resend requests that appear within a timeout's worth of microseconds of each other
-			ResendRequestIterator c = this->sampleResendRequests.find(message->AudioResendRequest.TrackID);
-			if (c != this->sampleResendRequests.end())
-			{
-				if (c->second.find(message->AudioResendRequest.SampleID) != c->second.end() &&
-					getMicroseconds() - c->second[message->AudioResendRequest.SampleID] < Networking::ClientReceivedPacketTimeout) 
-				{
-					Logger::logWarning("Received audio resend requests too close together (client GUID unknown)");
-					return;
-				}
-			}
-
-			//Resend the sample
-			this->sendAudioSample(message->AudioResendRequest.TrackID,
-									this->tracks[message->AudioResendRequest.TrackID].audioSamples[message->AudioResendRequest.SampleID],
-									message->AudioResendRequest.BufferRangeStartID,
-									message->AudioResendRequest.BufferRangeEndID);
-			
-			//Mark the last time this resend request was received
-			(this->sampleResendRequests[message->AudioResendRequest.TrackID])[message->AudioResendRequest.SampleID] = getMicroseconds();
-
-		}
-
-		///<summary>Responds to a volume data resend request.</summary>
-		///<param name="message">The message data.</summary>
-		///<param name="dataSize">The number of bytes in the datagram.</param>
-		void PlaybackServer::resendVolume(const PacketStructures::NetworkMessage* message, int dataSize){
-			
-			Logger::logWarning("Received a volume resend request");
-
-			//Drop resend requests that appear within a timeout's worth of microseconds of each other
-			ResendRequestIterator c = this->volumeResendRequests.find(message->VolumeResendRequest.TrackID);
-			if (c != this->volumeResendRequests.end())
-			{
-				if (c->second.find(message->VolumeResendRequest.SampleID) != c->second.end() &&
-					getMicroseconds() - c->second[message->VolumeResendRequest.SampleID] < Networking::ClientReceivedPacketTimeout) 
-				{
-					Logger::logWarning("Received volume resend requests too close together (client GUID unknown)");
-					return;
-				}
-			}
-
-			//Resend the volume data
-			this->sendVolumeData(message->VolumeResendRequest.TrackID, message->VolumeResendRequest.SampleID,
-									this->tracks[message->VolumeResendRequest.TrackID].volumeData[message->VolumeResendRequest.SampleID],
-									message->VolumeResendRequest.BufferRangeStartID,
-									message->VolumeResendRequest.BufferRangeEndID);
-			
-			//Mark the last time this resend request was received
-			(this->volumeResendRequests[message->VolumeResendRequest.TrackID])[message->VolumeResendRequest.SampleID] = getMicroseconds();
-
-		}
-
-		///<summary>This function will be called in order to notify the server that one or more clients have moved, 
-		/// joined, or dropped out, and that the volume must therefore be recalculated and resent.</summary>
-		void PlaybackServer::clientPositionsChanged() {
-			Logger::logNotice("Client positions have changed");
-		}
 				
 		///<summary>Reads audio data from the file and fills an AudioBuffer.</summary>
 		///<param name="filename">The name of the audio file.</param>
@@ -162,13 +26,6 @@ namespace Networking {
 				Logger::logWarning("Failed to open audio file %s", filename);
 				return PlaybackServerErrorCodes::PlaybackServer_FILE;
 			}
-
-			//File reading buffer
-			char readBuffer[4096];
-			int readCount = 0;
-
-			//Audio data struct setup
-			IO::AudioData audioData;
 
 			// TODO - actually read from file
 
@@ -193,13 +50,6 @@ namespace Networking {
 				return PlaybackServerErrorCodes::PlaybackServer_FILE;
 			}
 
-			//File reading buffer
-			char readBuffer[4096];
-			int readCount = 0;
-
-			//PositionInfo struct setup
-			PositionInfo positionData;
-
 			// TODO - actually read from file
 			
 			Logger::logNotice("Successfully read volume file %s", filename);
@@ -222,14 +72,14 @@ namespace Networking {
 			for (sampleid_t i = sampleStart; i <= sampleEnd; i++)
 			{
 				PositionInfo pos = positions[i];
-				ClientGUID closestClient = ClientInformationTable.begin()->first;
+				ClientGUID closestClient = this->clients.begin()->first;
 				ClientGUID furthestClient = closestClient;
 
 				// Map between ClientGUIDs and their distance from the audio source
 				std::map<ClientGUID, float> clientDistMap;
 
 				// Record each client's distance from the source
-				for (ClientIterator clientIt = ClientInformationTable.begin(); clientIt != ClientInformationTable.end(); clientIt++)
+				for (ClientIterator clientIt = this->clients.begin(); clientIt != this->clients.end(); clientIt++)
 				{
 					Client client = clientIt->second;
 					float dist = sqrt((pos.x - client.Offset.x) * (pos.x - client.Offset.x) + (pos.y - client.Offset.y) * (pos.y - client.Offset.y));
@@ -253,7 +103,7 @@ namespace Networking {
 
 				// Now go back through and scale each distance to fit in the range [0, 1];
 				// apply clipping to any volumes falling below a threshold
-				for (ClientIterator clientIt = ClientInformationTable.begin(); clientIt != ClientInformationTable.end(); clientIt++)
+				for (ClientIterator clientIt = this->clients.begin(); clientIt != this->clients.end(); clientIt++)
 				{
 					clientDistMap[clientIt->first] = (clientDistMap[clientIt->first] - minDist) / (maxDist - minDist);
 
@@ -266,6 +116,22 @@ namespace Networking {
 			}
 		}
 
+		void PlaybackServer::broadcastMessage(const void* __restrict data, int size) {
+			//Broadcast the message
+			for (ClientIterator i = this->clients.begin(); i != this->clients.end(); ++i) {
+				if (!sockets_send_message(
+						i->second.s,
+						data,
+						size)) {
+					//If the send size was 0, assume the socket connection was dropped
+					for (unsigned int j = 0; j < this->clientConnectedCallbacks.size(); ++j) {
+						this->clientDisconnectedCallbacks[j](i->first);
+					}
+
+				}
+			}									
+		}
+
 		///<summary>Broadcasts an audio sample to the client network.</summary>
 		///<param name="trackID">The ID of the track that this AudioSample belongs to.</param>
 		///<param name="sampleBuffer">The sample data.</param>
@@ -273,6 +139,8 @@ namespace Networking {
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffer range currently being delivered.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
 		void PlaybackServer::sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID){
+			
+					/// ----- THIS NEEDS TO BE BROADCAST ------
 
 			// TODO - log buffer start/end? Not clear on what these things are
 			Logger::logNotice("Sending audio sample; trackID: %d; sampleID: %d", trackID, sampleBuffer.SampleID);
@@ -295,8 +163,8 @@ namespace Networking {
 			//Include the length of the data in this message.
 			audioSampleMessage.networkHeader.Extra._dataLength = sampleBuffer.Data.DataLength;
 
-			//Send the data
-			this->sendSocket->SendMessage((char*)&audioSampleMessage, sizeof(PacketStructures::NetworkMessage) + sampleBuffer.Data.DataLength);
+			//Broadcast the data
+			this->broadcastMessage(&audioSampleMessage, sizeof(PacketStructures::NetworkMessage) + sampleBuffer.Data.DataLength);
 		}
 
 		///<summary>Broadcasts volume information for the client network.</summary>
@@ -307,6 +175,7 @@ namespace Networking {
 		///<returns>Integer return code specifying the result of the call.</returns>
 		void PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
 						
+					/// ----- THIS NEEDS TO BE BROADCAST ------
 			// TODO - log buffer start/end? Not clear on what these things are
 			Logger::logNotice("Sending volume sample; trackID: %d; sampleID: %d", trackID, sampleID);
 
@@ -344,72 +213,32 @@ namespace Networking {
 				}
 			}
 
-			//Send the data
-			this->sendSocket->SendMessage((char*)&volumeDataMessage, sizeof(PacketStructures::NetworkMessage) + sizeof(PacketStructures::ClientVolume) * volumeData.size());
+			//Broadcast the data
+			
+			this->broadcastMessage(&volumeDataMessage, 
+				sizeof(PacketStructures::NetworkMessage) + sizeof(PacketStructures::ClientVolume) * volumeData.size());
 
 		}
 
 		///<summary>Sends a disconnect packet to a particular client.</summary>
-		///<param name="clientID">The ID of the client to which this message applies</param>
-		void PlaybackServer::sendDisconnect(ClientGUID clientID) {
-
-			char idAsString[32];
-			formatGUIDAsString(idAsString, clientID);
-
-			Logger::logNotice("Sending disconnect message to client (GUID: %s)", idAsString);
+		///<param name="index">The index in the client list of the client to drop.</param>
+		void PlaybackServer::sendDisconnect(ClientGUID ID) {
+			
+			Logger::logNotice("Sending disconnect message to client (ID: %d)", ID);
 
 			PacketStructures::NetworkMessage disconnectMessage;
-			disconnectMessage.DisconnectNotification.clientID = clientID;
-			this->sendSocket->SendMessage((char*)&disconnectMessage, sizeof(PacketStructures::NetworkMessage));
-		}
-
-		///<summary>Single entry point for all network communications. Reads the control byte and acts on it accordingly.</summary>
-		///<param name="message">The network message.</param>
-		///<param name="datagramSize">The size of the datagram.</param>
-		void PlaybackServer::dispatchNetworkMessage(const PacketStructures::NetworkMessage* message, int datagramSize) {
+			disconnectMessage.ControlByte = ControlBytes::DISCONNECT;
 			
-			//switch on the control byte
-			switch (message->ControlByte){
-			
-				//A new connection.
-			case Networking::ControlBytes::NEW_CONNECTION:
-				this->receiveClientConnection(message, datagramSize);
-				break;
+			if (this->clients.find(ID) != this->clients.end()) {
+				sockets_send_message(this->clients[ID].s, &disconnectMessage, sizeof(PacketStructures::NetworkMessage));
+				close(this->clients[ID].s->sfd);
+				free(this->clients[ID].s);
+				this->clients.erase(this->clients.find(ID));
 
-				//A client check-in.
-			case Networking::ControlBytes::PERIODIC_CHECK_IN:
-				this->receiveClientCheckIn(message, datagramSize);
-				break;
-
-				//A client requesting an audio resend for a dropped packet.
-			case Networking::ControlBytes::RESEND_AUDIO:
-				if (!this->initialBuffering)
-					this->resendAudio(message, datagramSize);
-				else { 
-					//If we're in the initial buffering phase, check off that a sample didn't make it: "needs to be resent"
-					this->samplesResend[message->AudioResendRequest.SampleID] = true;
+				//Send the disconnect message
+				for (unsigned int j = 0; j < this->clientConnectedCallbacks.size(); ++j) {
+					this->clientDisconnectedCallbacks[j](ID);
 				}
-				break;
-
-				//A client requesting a volume resend for a dropped packet.
-			case Networking::ControlBytes::RESEND_VOLUME:
-				if (!this->initialBuffering)
-					this->resendVolume(message, datagramSize);
-				else { 
-					//If we're in the initial buffering phase, check off that a sample didn't make it: "needs to be resent"
-					this->samplesResend[message->VolumeResendRequest.SampleID] = true;
-				}
-				break;
-
-				//Transport control acknowledgements
-			case Networking::ControlBytes::BEGIN_PLAYBACK:
-			case Networking::ControlBytes::STOP_PLAYBACK:
-			case Networking::ControlBytes::PAUSE_PLAYBACK:
-				
-				//Acknowledge that this request has been filled by this client.
-				(this->requestsAcknowledged[message->TransportControl.requestID])[message->TransportControl.clientID] = true;
-
-				break;
 
 			}
 
@@ -418,21 +247,30 @@ namespace Networking {
 		///<summary>Handles network communications and hands off incoming packets to dispatchNetworkMessage().</summary>
 		void PlaybackServer::serverReceive(){
 
-			//Receive data buffer
-			struct {
-				PacketStructures::NetworkMessage message;
-				char data[1500-32];
-			} NetworkPacket;
+			//CONNECT CLIENTS
+			while (this->state != PlaybackServerStates::PlaybackServer_STOPPED) {
+				
+				//Attempt to connect new clients for up to 1 second. Timeouts give the server a chance to evaluate state.
+				_socket* newClient = (_socket*)calloc(1, sizeof(_socket));
+				if (sockets_accept(newClient, 1000) != -1) {
+					
+					PacketStructures::NetworkMessage connectMessage;
+					sockets_receive_message(newClient, &connectMessage, sizeof(connectMessage));
 
-			while (this->state != PlaybackServerStates::PlaybackServer_STOPPED){
+					Client c;
+					c.ClientID = connectMessage.ClientConnection.clientID;
+					c.Offset = connectMessage.ClientConnection.position;
+					c.s = newClient;
 
-				//Try to receive data for 100ms
-				int grams = this->recvSocket->TryReceiveMessage((char*)&NetworkPacket, 1500, 100);
+					this->clients[c.ClientID] = c;
 
-				//If grams == SocketError_TIMEOUT, the receive timed out. If grams == SOCKET_ERROR, there was a different error that can be retrieved with WSAGetLastError().
-				if (grams > 0){
-					//Hand off the packet
-					this->dispatchNetworkMessage(&NetworkPacket.message, grams);
+					//Send the client connected
+					for (unsigned int j = 0; j < this->clientConnectedCallbacks.size(); ++j) {
+						this->clientConnectedCallbacks[j](c);
+					}
+
+				} else {
+					free(newClient);
 				}
 
 			}
@@ -463,7 +301,6 @@ namespace Networking {
 				
 				//Play-Request variables
 				std::map<ClientGUID, Client> clients;
-				int bufferMax = 0;
 				int bufferCount = 0;
 				PacketStructures::NetworkMessage playMessage;
 				bool resend = true;
@@ -479,11 +316,6 @@ namespace Networking {
 				PacketStructures::NetworkMessage transportControlRequest;
 				//==============
 
-				//Timer_Tick-Request variables
-				time_t cTime;
-				std::vector<ClientGUID> clientDropList;
-				//==============
-
 				switch (request.controlCode){
 
 				//Process timer tick events
@@ -493,7 +325,7 @@ namespace Networking {
 
 						//Check to see if all tracks have ended
 						bool ended = true;
-						for (int i = 0; i < tracks.size(); ++i){
+						for (unsigned int i = 0; i < tracks.size(); ++i){
 							if ((getMicroseconds() - tracks[i].playbackRemainingTime) < tracks[i].playbackOriginOffset) {
 								ended = false;
 								break;
@@ -504,42 +336,6 @@ namespace Networking {
 							this->queueRequest(PlaybackServerRequestCode::PlaybackServer_STOP);
 						}
 
-					}
-
-					//Check to see if any clients have timed out
-					cTime = getMicroseconds();
-
-					for (ClientIterator i = Networking::ClientInformationTable.begin(); i != Networking::ClientInformationTable.end(); ++i) {
-						//If the time between check-ins exceeds CLIENT_CHECKIN_DELAY milliseconds, drop the client
-						if ((cTime - i->second.LastCheckInTime) / 1000 > CLIENT_CHECKIN_DELAY) {
-
-							char guid[128];
-							formatGUIDAsString(guid, i->second.ClientID);
-							Logger::logWarning("A client has timed out and been disconnected; GUID: %s", guid);
-
-							this->sendDisconnect(i->second.ClientID);
-							clientDropList.push_back(i->second.ClientID);
-
-							//Raise the event for this client's disconnect
-							for (int j = 0; j < this->clientDisconnectedCallbacks.size(); ++i) {
-								this->clientDisconnectedCallbacks[j](i->second);
-							}
-
-						}
-					}
-					if (clientDropList.size()) {
-						EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
-
-						for (int i = 0; i < clientDropList.size(); ++i) {
-							//Take the client out of the information table, and free up any current requests that may be waiting on it
-							Networking::ClientInformationTable.erase(clientDropList[i]);
-							ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].find(clientDropList[i]);
-							if (j != this->requestsAcknowledged[this->currentRequestID].end()) {
-								this->requestsAcknowledged[this->currentRequestID].erase(j->first);
-							}
-						}
-
-						LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
 					}
 
 					//Indicate that this timer tick was consumed
@@ -584,17 +380,7 @@ namespace Networking {
 					//If the current state is STOPPED, we have to do initial buffer, otherwise, we just send PLAY packets.
 					//Otherwise otherwise, we just ignore it.
 					if (this->playbackState == PlaybackStates::Playback_STOPPED) {
-						//Indicate that this is the initial buffering phase
-						this->initialBuffering = true;
-
-						//Acquire a local copy of the list of clients
-						clients = ClientInformationTable;
-					
-						//Count the number of samples to buffer
-						for (unsigned int i = 0; i < tracks.size(); ++i) {
-							bufferMax += min(tracks[i].audioSamples.size(), RequiredBufferedSamplesCount) * 2;
-						}
-
+						
 						//Send the first RequiredBufferedSamplesCount samples and accompanying volume information
 						//and ensure that they arrive.
 						for (unsigned int i = 0; i < tracks.size(); ++i) 
@@ -607,56 +393,10 @@ namespace Networking {
 							unsigned int trackBufferSize = min(tracks[i].audioSamples.size(), RequiredBufferedSamplesCount);
 
 							//Add each sample as "not needing to be resent"
-							this->samplesResend.clear();
-							this->volumesResend.clear();
 							for (unsigned int j = 0; j < trackBufferSize; ++j) {
-								this->samplesResend[j] = false;
-								this->volumesResend[j] = false;
+								this->sendAudioSample(i, tracks[i].audioSamples[j], 0, trackBufferSize);
+								this->sendVolumeData(i, j, tracks[i].volumeData[j], 0, trackBufferSize);
 							}
-
-							//Send samples
-							do {
-								//Iterate over the keys left in sampleReceivedCounts (those are the sampleid_t's of the samples that haven't successfully buffered),
-								//and attempt to buffer them.
-								for (BufferingIterator j = this->samplesResend.begin(); j != this->samplesResend.end(); ++j) {
-									this->sendAudioSample(i, tracks[i].audioSamples[j->first], 0, trackBufferSize);
-								}
-														
-								//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
-								Networking::busyWait(Networking::ClientReceivedPacketTimeout);
-
-								std::map<sampleid_t, bool> tempSampleResend;
-
-								//Add samples back that didn't make it
-								for (BufferingIterator j = this->samplesResend.begin(); j != this->samplesResend.end(); ++j) {
-									if (j->second)
-										tempSampleResend[j->first] = false;
-								}
-								this->samplesResend = tempSampleResend;
-
-							} while (this->samplesResend.size());
-
-							//Send volume data
-							do {
-								//Iterate over the keys left in sampleReceivedCounts (those are the sampleid_t's of the samples that haven't successfully buffered),
-								//and attempt to buffer them.
-								for (BufferingIterator j = this->volumesResend.begin(); j != this->volumesResend.end(); ++j) {
-									this->sendVolumeData(i, j->first, tracks[i].volumeData[j->first], 0, trackBufferSize);
-								}
-							
-								//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
-								Networking::busyWait(Networking::ClientReceivedPacketTimeout);
-
-								std::map<sampleid_t, bool> tempVolumeResend;
-
-								//Add samples back that didn't make it
-								for (BufferingIterator j = this->volumesResend.begin(); j != this->volumesResend.end(); ++j) {
-									if (j->second)
-										tempVolumeResend[j->first] = false;
-								}
-								this->samplesResend = tempVolumeResend;
-
-							} while (this->samplesResend.size());
 
 							if (trackBufferSize == Networking::RequiredBufferedSamplesCount){
 								PlaybackServerRequestData bufferRequestData;
@@ -672,44 +412,23 @@ namespace Networking {
 
 						}
 
-						//Buffering is complete
-						this->initialBuffering = false;
-
-						//Send PLAY control packets and ensure that every client has begun playback
-						++this->currentRequestID;
+						//Send PLAY control packets
 
 						playMessage.ControlByte = ControlBytes::BEGIN_PLAYBACK;
-						playMessage.TransportControl.requestID = this->currentRequestID;
 
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
 						playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
 
 						//Mark when each track began playback
-						for (int i = 0; i < tracks.size(); ++i) {
+						for (unsigned int i = 0; i < tracks.size(); ++i) {
 							tracks[i].playbackOriginOffset = playMessage.TransportControl.timeOffset;
 						}
 					
-						for (int i = 0; i < 3 && resend; ++i){
-
-							this->sendSocket->SendMessage((char*)&playMessage, sizeof(playMessage));
-
-							//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
-							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
-
-							resend = false;
-							EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
-
-							//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
-							for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
-								if (j->second) {
-									resend = true;
-									break;
-								}
-
-							LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
-						}
-					
+						//Broadcast the message
+						this->broadcastMessage(&playMessage, sizeof(playMessage));
+						
+						
 						this->playbackState = PlaybackState::Playback_PLAYING;
 					}
 					else if (this->playbackState == PlaybackStates::Playback_PAUSED) {
@@ -717,40 +436,21 @@ namespace Networking {
 						//Sync up on resume
 						//Buffering should always be happening after the initial buffering, so no buffering needs to happen here
 						
-						//Send PLAY control packets and ensure that every client has begun playback
-						++this->currentRequestID;
+						//Send PLAY control packets
 
 						playMessage.ControlByte = ControlBytes::BEGIN_PLAYBACK;
-						playMessage.TransportControl.requestID = this->currentRequestID;
 
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
 						playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
 
 						//Update when each track began playback again
-						for (int i = 0; i < tracks.size(); ++i) {
+						for (unsigned int i = 0; i < tracks.size(); ++i) {
 							tracks[i].playbackOriginOffset = playMessage.TransportControl.timeOffset;
 						}
 					
-						for (int i = 0; i < 3 && resend; ++i){
-
-							this->sendSocket->SendMessage((char*)&playMessage, sizeof(playMessage));
-
-							//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
-							Networking::busyWait(Networking::ClientReceivedPacketTimeout);
-
-							resend = false;
-							EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
-
-							//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
-							for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
-								if (j->second) {
-									resend = true;
-									break;
-								}
-
-							LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
-						}
+						//Broadcast the message
+						this->broadcastMessage(&playMessage, sizeof(playMessage));
 					
 						this->playbackState = PlaybackState::Playback_PLAYING;
 
@@ -764,40 +464,20 @@ namespace Networking {
 					//If we aren't currently playing, ignore this request.
 					if (this->playbackState != PlaybackStates::Playback_PLAYING) break;
 
-					//Send PAUSE control packets and ensure that every client has paused playback
-					++this->currentRequestID;
+					//Send PAUSE control packets
 
 					transportControlRequest.ControlByte = ControlBytes::PAUSE_PLAYBACK;
-					transportControlRequest.TransportControl.requestID = this->currentRequestID;
 
 					//Indicate that the clients should pause immediately when they receive the message
 					transportControlRequest.TransportControl.timeOffset = getMicroseconds();
 
 					//Update the remaining amount of time for each track
-					for (int i = 0; i < tracks.size(); ++i) {
+					for (unsigned int i = 0; i < tracks.size(); ++i) {
 						tracks[i].playbackRemainingTime = tracks[i].trackLength - (transportControlRequest.TransportControl.timeOffset - tracks[i].playbackOriginOffset);
 					}
 					
-					do {
-
-						this->sendSocket->SendMessage((char*)&transportControlRequest, sizeof(transportControlRequest));
-
-						//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
-						Networking::busyWait(Networking::ClientReceivedPacketTimeout);
-
-						resend = false;
-						EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
-
-						//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
-						for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
-							if (j->second) {
-								resend = true;
-								break;
-							}
-						
-						LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
-
-					} while (resend);
+					//Broadcast the message
+					this->broadcastMessage(&transportControlRequest, sizeof(transportControlRequest));
 
 					this->playbackState = PlaybackStates::Playback_PAUSED;
 
@@ -809,34 +489,14 @@ namespace Networking {
 					//If we aren't currently playing, ignore this request.
 					if (this->playbackState != PlaybackStates::Playback_PLAYING) break;
 
-					//Send PAUSE control packets and ensure that every client has paused playback
-					++this->currentRequestID;
-
+					//Send PAUSE control packets
 					transportControlRequest.ControlByte = ControlBytes::STOP_PLAYBACK;
-					transportControlRequest.TransportControl.requestID = this->currentRequestID;
 
 					//Indicate that the clients should pause immediately when they receive the message
 					transportControlRequest.TransportControl.timeOffset = getMicroseconds();
 					
-					do {
-
-						this->sendSocket->SendMessage((char*)&transportControlRequest, sizeof(transportControlRequest));
-
-						//Wait for the amount of time that should indicate that every client either recieved or did not recieve one of the packets
-						Networking::busyWait(Networking::ClientReceivedPacketTimeout);
-
-						resend = false;
-						EnterCriticalSection(&this->requestsAcknowledgedCriticalSection);
-
-						//Iterate over the acknowledged requests to determine if any clients did not receive the play control byte
-						for (ClientAcknowledgementIterator j = this->requestsAcknowledged[this->currentRequestID].begin(); j != this->requestsAcknowledged[this->currentRequestID].end(); ++j)
-							if (j->second) {
-								resend = true;
-								break;
-							}
-
-						LeaveCriticalSection(&this->requestsAcknowledgedCriticalSection);
-					} while (resend);
+					//Broadcast the message
+					this->broadcastMessage(&transportControlRequest, sizeof(transportControlRequest));
 
 					this->playbackState = PlaybackStates::Playback_STOPPED;
 
@@ -937,19 +597,14 @@ namespace Networking {
 		
 		///<summary>Constructs a PlaybackServer object.</summary>
 		PlaybackServer::PlaybackServer() {
-			this->recvSocket = NULL;
-			this->sendSocket = NULL;
+			this->serverSocket = NULL;
 			this->serverMainThread = NULL;
 			this->serverReceivingThread = NULL;
-			this->currentRequestID = 0;
 			this->state = PlaybackServerStates::PlaybackServer_STOPPED;
 			this->playbackState = PlaybackStates::Playback_INVALID;
-			this->initialBuffering = false;
 			InitializeCriticalSection(&this->controlMessagesCriticalSection);
 			InitializeCriticalSection(&this->timerDestroyedCriticalSection);
-			InitializeCriticalSection(&this->requestsAcknowledgedCriticalSection);
 			this->controlMessagesResourceCount = CreateSemaphore(NULL, 0, USHRT_MAX, NULL);
-
 			//Create timer thread
 			this->timerTicked = false;
 			CreateThread(NULL, 0, &PlaybackServer::timerRoute, (void*)this, 0, NULL);
@@ -957,14 +612,11 @@ namespace Networking {
 
 		///<summary>Destructs a PlaybackServer object.</summary>
 		PlaybackServer::~PlaybackServer(){
-			if (this->recvSocket){
-				delete this->recvSocket;
-				this->recvSocket = NULL;
+			if (this->serverSocket){
+				free(this->serverSocket);
+				this->serverSocket = NULL;
 			}
-			if (this->sendSocket){
-				delete this->sendSocket;
-				this->sendSocket = NULL;
-			}
+
 			if (this->serverMainThread)
 				CloseHandle(this->serverMainThread);
 			if (this->serverReceivingThread)
@@ -979,7 +631,6 @@ namespace Networking {
 			DeleteCriticalSection(&this->timerDestroyedCriticalSection);
 
 			DeleteCriticalSection(&this->controlMessagesCriticalSection);
-			DeleteCriticalSection(&this->requestsAcknowledgedCriticalSection);
 		}
 
 		// ---------------------------------------------
@@ -1104,29 +755,9 @@ namespace Networking {
 			PlaybackServer* server = new PlaybackServer();
 
 			//Attempt to create the sendSocket inside the Server
-			int sendSocketCode = Socket::Create(&server->sendSocket, Networking::SocketType::UDP, Networking::AddressFamily::IPv4);
-			if (SOCKETFAILED(sendSocketCode)){
-				delete server;
-				return sendSocketCode;
-			}
-
-			//Set the sendSocket up for UDP broadcasting
-			// TODO make this shit broadcast somewhere useful
-			server->sendSocket->PrepareUDPSend(NetworkPort, "127.0.0.1");
-
-			//Attempt to create the recvSocket inside the Server
-			int recvSocketCode = Socket::Create(&server->recvSocket, Networking::SocketType::UDP, Networking::AddressFamily::IPv4);
-			if (SOCKETFAILED(recvSocketCode)){
-				delete server;
-				return recvSocketCode;
-			}
-
-			//Attempt to set the recvSocket up for UDP receiving
-			recvSocketCode = server->recvSocket->PrepareUDPReceive(NetworkPort);
-			if (SOCKETFAILED(recvSocketCode)){
-				delete server;
-				return recvSocketCode;
-			}
+			server->serverSocket = sockets_server_socket(Networking::NetworkPort);
+			if (!server->serverSocket)
+				return errno;
 
 			*fillServer = server;
 			return Networking::SocketErrorCode::SocketError_OK;
@@ -1176,9 +807,4 @@ namespace Networking {
 			this->clientDisconnectedCallbacks.push_back(callback);
 		}
 
-		///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
-		///<param name="callback">A pointer to the function to call when the event is raised.</param>
-		void PlaybackServer::OnClientCheckIn(ClientCheckInCallback callback) {
-			this->clientCheckInCallbacks.push_back(callback);
-		}
 }

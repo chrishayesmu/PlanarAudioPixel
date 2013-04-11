@@ -2,6 +2,7 @@
 
 #ifndef RASPBERRY_PI
 
+#define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <WS2tcpip.h>
 
@@ -22,7 +23,7 @@ typedef int SOCKET;
 
 #include <stdio.h>
 
-#pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "ws2_32.lib")
 
 #undef SendMessage
 
@@ -88,6 +89,12 @@ namespace Networking {
 	///<returns>A lexical representation of the error code as a character string.</returns>
 	LPCTSTR SocketErrorToString(int s);
 	#endif
+
+	
+	struct SocketInfo {
+		struct sockaddr info;
+	};
+
 
 	///<summary>A class for creating and using winsock socket connections.</summary>
 	class Socket {
@@ -162,10 +169,17 @@ namespace Networking {
 		///<summary>Blocking call that receives a message on this socket.</summary>
 		///<param name="buffer">The buffer in which to store the received message.</param>
 		///<param name="buffersize">The maximum length of the buffer.</param>
-		///<param name="sender">A reference to the sockadd_in struct to fill with the information regarding the sending.</param>
+		///<param name="sender">A reference to the sockadd_in struct to fill with the information regarding the connection.</param>
 		///<param name="senderSize">A reference to an integer to fill with the byte length of <paramref name="sender" />.</param>
 		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
-		int ReceiveMessage(char* buffer, int buffersize, sockaddr_in* sender, int* senderSize);
+		int ReceiveMessage(char* buffer, int buffersize, sockaddr* sender, int* senderSize);
+	
+		///<summary>Blocking call that receives a message on this socket.</summary>
+		///<param name="buffer">The buffer in which to store the received message.</param>
+		///<param name="buffersize">The maximum length of the buffer.</param>
+		///<param name="sender">A reference to the SocketInfo struct to fill with the information regarding the connection.</param>
+		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
+		int ReceiveMessage(char* buffer, int buffersize, SocketInfo* socketinfo);
 	
 		///<summary>Blocking call that receives a message on this socket.</summary>
 		///<param name="buffer">The buffer in which to store the received message.</param>
@@ -177,10 +191,10 @@ namespace Networking {
 		///<param name="buffer">The buffer in which to store the received message.</param>
 		///<param name="buffersize">The maximum length of the buffer.</param>
 		///<param name="msCount">The number of milliseconds to wait for the socket to have data available.</param>
-		///<param name="sender">A reference to the sockadd_in struct to fill with the information regarding the sending.</param>
+		///<param name="sender">A reference to the sockadd_in struct to fill with the information regarding the connection.</param>
 		///<param name="senderSize">A reference to an integer to fill with the byte length of <paramref name="sender" />.</param>
 		///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function. Timeout can be checked with the SOCKETTIMEOUT(x) macro.</returns>
-		int TryReceiveMessage(char* buffer, int buffersize, time_t msCount, sockaddr_in* sender, int* senderSize);
+		int TryReceiveMessage(char* buffer, int buffersize, time_t msCount, sockaddr* sender, int* senderSize);
 	
 		///<summary>Attempts to recieve a message for the specified number of milliseconds.</summary>
 		///<param name="buffer">The buffer in which to store the received message.</param>

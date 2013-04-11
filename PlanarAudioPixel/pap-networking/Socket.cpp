@@ -52,7 +52,7 @@ namespace Networking {
 		if (sc->recvSocket == INVALID_SOCKET || sc->sendSocket == INVALID_SOCKET) 
 			hr = SocketError_INVALIDSOCKET;
 
-	cleanup:
+cleanup:
 		if (SOCKETFAILED(hr)){
 			delete sc;
 			*s = NULL;
@@ -118,12 +118,25 @@ namespace Networking {
 	int Socket::SendMessage(const char* message, int messageLength){
 		if (!this->boundSendIP) 
 			return SocketError_IPNOTBOUND;
+
+		int iOptVal = 64; 
+		if (setsockopt (this->sendSocket, 
+                  IPPROTO_IP, 
+                  IP_MULTICAST_TTL, 
+                  (char FAR *)&iOptVal, 
+                  sizeof (int)) == SOCKET_ERROR)
+		  {
+			wprintf (L"setsockopt failed! Error: %d",
+					  WSAGetLastError ());
+			return FALSE;
+		  }
+
 		int r = sendto(this->sendSocket,
 			message, messageLength, 0, (SOCKADDR*)(&this->sendAddress), sizeof(this->sendAddress));
 		return r;
 	}
 
-	int Socket::ReceiveMessage(char* buffer, int buffersize, sockaddr_in* sender, int* senderSize){
+	int Socket::ReceiveMessage(char* buffer, int buffersize, sockaddr* sender, int* senderSize){
 		if (!this->boundRecvPort) return SocketError_PORTNOTBOUND;
 		if (!buffer) return SocketError_POINTER;
 		int r = recvfrom(this->recvSocket,
@@ -133,15 +146,24 @@ namespace Networking {
 	int Socket::ReceiveMessage(char* buffer, int buffersize){
 		return this->ReceiveMessage(buffer, buffersize, NULL, NULL);
 	}
-
 	
+	///<summary>Blocking call that receives a message on this socket.</summary>
+	///<param name="buffer">The buffer in which to store the received message.</param>
+	///<param name="buffersize">The maximum length of the buffer.</param>
+	///<param name="sender">A reference to the SocketInfo struct to fill with the information regarding the connection.</param>
+	///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
+	int Socket::ReceiveMessage(char* buffer, int buffersize, SocketInfo* socketinfo) {
+		int src_size = sizeof(socketinfo->info);
+		return this->ReceiveMessage(buffer, buffersize, (sockaddr*)socketinfo, &src_size);
+	}
+
 	///<summary>Blocking call that receives a message on this socket.</summary>
 	///<param name="buffer">The buffer in which to store the received message.</param>
 	///<param name="buffersize">The maximum length of the buffer.</param>
 	///<param name="sender">A reference to the sockadd_in struct to fill with the information regarding the sending.</param>
 	///<param name="senderSize">A reference to an integer to fill with the byte length of <paramref name="sender" />.</param>
 	///<returns>An integer error code. Errors can be printed using the SocketErrorToString() function.</returns>
-	int Socket::TryReceiveMessage(char* buffer, int buffersize, time_t msCount, sockaddr_in* sender, int* senderSize){
+	int Socket::TryReceiveMessage(char* buffer, int buffersize, time_t msCount, sockaddr* sender, int* senderSize){
 		struct timeval timeOut;
 		timeOut.tv_sec = (long)(msCount / 1000);
 		timeOut.tv_usec = (long)((msCount - (timeOut.tv_sec * 1000)) * 1000);
