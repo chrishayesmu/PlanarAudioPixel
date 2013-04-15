@@ -1,4 +1,5 @@
-#ifdef RASPBERRY_PI
+#ifndef PLAYBACKCLIENT
+#define PLAYBACKCLIENT
 
 #include "../pap-file-io/Logger.h"
 #include "NetworkStructures.h"
@@ -18,8 +19,9 @@
 #include <boost/date_time.hpp>
 #include <boost/bind.hpp>
 
-#define PACKETRECEIPTTIMEOUT 2000
+#define AUDIOHEADERRANGE 1
 #define NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS 5
+#define PACKETRECEIPTTIMEOUT 2000
 #define SIZE_OF_PAYLOAD 1468
 #define SIZE_OF_IP_INET_ADDRESSES 50
 
@@ -31,70 +33,15 @@ namespace Networking
 		char data[SIZE_OF_PAYLOAD];
 		};
 	
-	/*
-	I'm overloading comparison operators for a MESSAGEPACKET queue data structure
-	Using less than operator for audio samples, and greater than operator for volume samples
-	Can be changed based on chris' work
-	*/
-	bool operator < ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 )
-		{
-		switch( messagePacket1.messageHeader.ControlByte )
-			{
-			case ControlBytes::SENDING_AUDIO:
-				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
-					{
-					return messagePacket1.messageHeader.AudioSample.TrackID < messagePacket2.messageHeader.AudioSample.TrackID;
-					}
-				else
-					{
-					return messagePacket1.messageHeader.AudioSample.SampleID < messagePacket2.messageHeader.AudioSample.SampleID;
-					}
-			default:
-				if( messagePacket1.messageHeader.VolumeSample.TrackID != messagePacket2.messageHeader.VolumeSample.TrackID )
-					{
-					return messagePacket1.messageHeader.VolumeSample.TrackID < messagePacket2.messageHeader.VolumeSample.TrackID;
-					}
-				else
-					{
-					return messagePacket1.messageHeader.VolumeSample.SampleID < messagePacket2.messageHeader.VolumeSample.SampleID;
-					}
-			}
-		}
 	
-	bool operator > ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 )
-		{
-		switch( messagePacket1.messageHeader.ControlByte )
-			{
-			case ControlBytes::SENDING_AUDIO:
-				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
-					{
-					return messagePacket1.messageHeader.AudioSample.TrackID > messagePacket2.messageHeader.AudioSample.TrackID;
-					}
-				else
-					{
-					return messagePacket1.messageHeader.AudioSample.SampleID > messagePacket2.messageHeader.AudioSample.SampleID;
-					}
-			default:
-				if( messagePacket1.messageHeader.VolumeSample.TrackID != messagePacket2.messageHeader.VolumeSample.TrackID )
-					{
-					return messagePacket1.messageHeader.VolumeSample.TrackID > messagePacket2.messageHeader.VolumeSample.TrackID;
-					}
-				else
-					{
-					return messagePacket1.messageHeader.VolumeSample.SampleID > messagePacket2.messageHeader.VolumeSample.SampleID;
-					}
-			}
-		}
+	bool operator < ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 );
+	bool operator > ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 );
 
-	Networking::ClientGUID stringToGuid( char *aBroadCastIP, char *aLocalIP );
-	
 	class PlaybackClient 
 		{
 		public:
 			PlaybackClient( char *aHostName, char *aPortNumber, float aXPosition, float aYPosition, char *aIPAddress = NULL );
 			~PlaybackClient(){}
-			void connectToServer();
-			void checkInWithServer();
 			
 			void listenerFunction();
 			void changePlaybackStatus(  const unsigned char aControlByte );
@@ -113,13 +60,8 @@ namespace Networking
 									Networking::requestid_t aRequestID = 0 );
 			
 			int queueMessagesFromServer();
-			int checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket );
-			void getExpectedPacketValues(	MESSAGEPACKET aMessagePacket,
-											Networking::trackid_t *aTrackID,
-											Networking::sampleid_t *aSampleID,
-											Networking::sampleid_t *aBufferRangeStartID,
-											Networking::sampleid_t *aBufferRangeEndID,
-											timeval *aTimeoutStartTime = NULL );
+			int AddAudioOrVolumePacketToList( MESSAGEPACKET aMessagePacket );
+			void checkForMissingAudioHeader( MESSAGEPACKET aMessagePacket );
 			
 		private:
 		
@@ -143,6 +85,7 @@ namespace Networking
 			
 			boost::thread *cListenerThread, *cPlaybackThread;
 			
+			bool cFirstAudioPacket, cIsAudioCaughtUp;
 			int cAudioPacketCounter, cVolumePacketCounter;
 			timeval cAudioTimeoutStartTime, cVolumeTimeoutStartTime, cCurrentTime;
 			Networking::trackid_t cNextAudioTrackID, cNextVolumeTrackID;

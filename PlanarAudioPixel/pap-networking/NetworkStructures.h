@@ -232,7 +232,7 @@ namespace Networking
 					struct {
 						/* [8] */ ClientGUID clientID;
 								uint32_t _client_pad;
-						#ifndef RASPBERRY_PI
+						#ifndef __GNUC__
 						/* [8] */ requestid_t requestID;
 						#else
 						/* [8] */ requestid_t clientRequestID;

@@ -1,9 +1,11 @@
 #ifndef _sockets
 #define _sockets
 
+#ifndef __GNUC__
 #include <winsock2.h>
 #include <WS2tcpip.h>
 #include <io.h>
+#endif
 
 #define open _open
 #define write _write
@@ -37,13 +39,17 @@ struct sockaddr {
 */
 
 typedef struct _socket {
+	#ifndef __GNUC__
 	struct sockaddr_in 	ADDRESS;
+	#endif
 	struct hostent*		HOST;
 	char				HOSTNAME[512];
 	int					sfd;
 	
 	struct sockaddr* 	CONNECTED_ADDRESS;
+	#ifndef __GNUC__
 	socklen_t			CONNECTED_ADDRESS_LENGTH;
+	#endif
 } _socket;
 
 //creates a new _socket whose purpose is to act as a server socket and accept incoming connections

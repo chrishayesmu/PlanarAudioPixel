@@ -1,5 +1,3 @@
-#ifdef RASPBERRY_PI
-
 #include "PlaybackClient.h"
 #include "Socket.h"
 #include "NetworkGlobals.h"
@@ -10,19 +8,62 @@
 
 namespace Networking 
 	{
+	
 	/*
-	This function converts IP address strings into the format of a ClientGUID
-	There is no error checking.
+	I'm overloading comparison operators for a MESSAGEPACKET queue data structure
+	Using less than operator for audio samples, and greater than operator for volume samples
+	Can be changed based on chris' work
 	*/
-	Networking::ClientGUID stringToGuid( char *aBroadCastIP, char *aLocalIP ) 
+	bool operator < ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 )
 		{
-		Networking::ClientGUID guid;
-		sscanf( aBroadCastIP, "%uh.%uh.%uh.%uh", &guid.BroadcastIP.Byte1, &guid.BroadcastIP.Byte2, &guid.BroadcastIP.Byte3, &guid.BroadcastIP.Byte4 );
-		sscanf( aLocalIP, "%uh.%uh.%uh.%uh", &guid.LocalIP.Byte1, &guid.LocalIP.Byte2, &guid.LocalIP.Byte3, &guid.LocalIP.Byte4 );
-		
-		return guid;
+		switch( messagePacket1.messageHeader.ControlByte )
+			{
+			case ControlBytes::SENDING_AUDIO:
+				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
+					{
+					return messagePacket1.messageHeader.AudioSample.TrackID < messagePacket2.messageHeader.AudioSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.AudioSample.SampleID < messagePacket2.messageHeader.AudioSample.SampleID;
+					}
+			default:
+				if( messagePacket1.messageHeader.VolumeSample.TrackID != messagePacket2.messageHeader.VolumeSample.TrackID )
+					{
+					return messagePacket1.messageHeader.VolumeSample.TrackID < messagePacket2.messageHeader.VolumeSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.VolumeSample.SampleID < messagePacket2.messageHeader.VolumeSample.SampleID;
+					}
+			}
 		}
-		
+	
+	bool operator > ( MESSAGEPACKET messagePacket1, MESSAGEPACKET messagePacket2 )
+		{
+		switch( messagePacket1.messageHeader.ControlByte )
+			{
+			case ControlBytes::SENDING_AUDIO:
+				if( messagePacket1.messageHeader.AudioSample.TrackID != messagePacket2.messageHeader.AudioSample.TrackID )
+					{
+					return messagePacket1.messageHeader.AudioSample.TrackID > messagePacket2.messageHeader.AudioSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.AudioSample.SampleID > messagePacket2.messageHeader.AudioSample.SampleID;
+					}
+			default:
+				if( messagePacket1.messageHeader.VolumeSample.TrackID != messagePacket2.messageHeader.VolumeSample.TrackID )
+					{
+					return messagePacket1.messageHeader.VolumeSample.TrackID > messagePacket2.messageHeader.VolumeSample.TrackID;
+					}
+				else
+					{
+					return messagePacket1.messageHeader.VolumeSample.SampleID > messagePacket2.messageHeader.VolumeSample.SampleID;
+					}
+			}
+		}
+	
 	/*
 	PlaybackClient constructor just sets up udp stuff
 	*/
@@ -40,7 +81,9 @@ namespace Networking
 			cNextAudioBufferRangeEndID( -1 ),
 			cNextVolumeSampleID( -1 ),
 			cNextVolumeBufferRangeStartID( -1 ),
-			cNextVolumeBufferRangeEndID( -1 )			
+			cNextVolumeBufferRangeEndID( -1 ),
+			cFirstAudioPacket( true ),
+			cIsAudioCaughtUp( false )
 		{
 		timeval mTimeval;
 		gettimeofday(&mTimeval, 0);
@@ -52,147 +95,44 @@ namespace Networking
 		Logger::logNotice( "Starting playback client" );
 		Logger::logNotice( "Startup Time in seconds: %d", mTimeval.tv_sec );
 		
-		cSocketData = socket( AF_INET, SOCK_DGRAM, 0 );
-		fcntl( cSocketData, F_SETFL, O_NONBLOCK );
+		while( cSocketData = socket( AF_INET, SOCK_STREAM, 0 ) < 0 )
+			{
+			Logger::logWarning( "ERROR opening socket" );
+			}
+		
+		memset( &cServer, 0, sizeof( cServer ) );
 		cServer.sin_family = AF_INET;
 		
-		/*
-		Get local machine info
-		*/
-		/******************************Needs Work******************************/
-		//Need to figure out how to get a non local ip address
-		gethostname( cBroadcastIP, SIZE_OF_IP_INET_ADDRESSES );
-		Logger::logNotice( "----UDPClient1 running at host NAME: %s", cBroadcastIP );
-		cHostEntry = gethostbyname( cBroadcastIP );
-		memcpy( &( cServer.sin_addr ), cHostEntry->h_addr, cHostEntry->h_length );
-		Logger::logNotice( "(UDPClient1 INET ADDRESS is: %s )", inet_ntoa( cServer.sin_addr ) );
-		strncpy( cLocalIP, inet_ntoa( cServer.sin_addr ), SIZE_OF_IP_INET_ADDRESSES );
-		//Temporary until I find a way to get non local ip address
-		strncpy( cBroadcastIP, aIPAddress, SIZE_OF_IP_INET_ADDRESSES );
-		Logger::logNotice( "Client IP Address: %s", cBroadcastIP );
-
-		/*
-		Segmentation fault will occur with bad aHostName
-		*/
 		cHostEntry = gethostbyname( aHostName );
+		if( cHostEntry == NULL )
+			{
+			Logger::logWarning( "ERROR: No such host" );
+			Logger::closeLogFile();
+			exit( 0 );
+			}
+		
 		memcpy( &(cServer.sin_addr.s_addr), cHostEntry->h_addr, cHostEntry->h_length);
 		cServer.sin_port = htons( atoi( aPortNumber ) );
 		
+		while( connect( cSocketData, (struct sockaddr *)&cServer , sizeof( cServer ) ) < 0 )
+			{
+			Logger::logWarning( "ERROR connecting" );
+			}
+			
+		Logger::logNotice( "Successfully connected to server" );
 		
-		connectToServer();
 		cListenerThread = new boost::thread( boost::bind ( &Networking::PlaybackClient::listenerFunction, this ) );
 		//cPlaybackThread = new boost::thread( boost::bind ( &Networking::PlaybackClient::playbackFunction, this ) );
 		playbackFunction();
 		}
 		
-	/*
-	1)This function broadcasts a new connection message
-	2)After broadcasting the message, it waits to recieve a response from the server.
-	3)If it doesn't receive a response from the server before the timeout, it retransmits
-	4)If it receives a response, but not a new connection response, it retransmits
-	5)It repeats this process until it recieves the correct message from the server
-	*/
-	void PlaybackClient::connectToServer() 
-		{
-		int mRecieve = -1;
-		timeval mTimeoutTime, cCurrentTime;
-		Logger::logNotice( "Connecting to server" );
-		
-		do
-			{
-			Logger::logNotice( "Sending NEW_CONNECTION packet" );
-			sendMessageToServer( ControlBytes::NEW_CONNECTION );
-			
-			gettimeofday( &mTimeoutTime, 0 );
-			gettimeofday( &cCurrentTime, 0 );
-			
-			while( ( cCurrentTime.tv_sec - mTimeoutTime.tv_sec ) * 1000 + ( cCurrentTime.tv_usec - mTimeoutTime.tv_usec ) / 1000 
-					< PACKETRECEIPTTIMEOUT )
-				{
-				if( ( mRecieve = recieveMessageFromServer() ) != -1 )
-					{
-					break;
-					}
-				
-				gettimeofday( &cCurrentTime, 0 );
-				}
-				
-			if( mRecieve != -1 )
-				{
-				if( cIncomingMessage.messageHeader.ControlByte == ControlBytes::NEW_CONNECTION )
-					{
-					Logger::logNotice( "Received NEW_CONNECTION packet" );
-					Logger::logNotice( "Successfully connected to server" );
-					return;
-					}
-				}
-			
-			Logger::logWarning( "Server response to NEW_CONNECTION timed out." );
-			}while( 1 );		
-		}
-	
 	void PlaybackClient::listenerFunction()
 		{
 		int mNewMessages;
-		timeval mCheckInTime, cCurrentTime;
-		gettimeofday( &mCheckInTime, 0 );
-				
+						
 		do
 			{
-			/*
-			All of the Timeout stuff together.
-			I probably don't need to keep calling gettimeofday() as it happens so close together, but as we're
-				aiming for time precision, I did it nonetheless.
-			*/
-			
-			gettimeofday( &cCurrentTime, 0 );
-			if( ( cCurrentTime.tv_sec - mCheckInTime.tv_sec ) * 1000 + ( cCurrentTime.tv_usec - mCheckInTime.tv_usec ) / 1000 
-					> CLIENT_CHECKIN_DELAY )
-				{
-				Logger::logNotice( "Initiating periodic check in with server" );
-				checkInWithServer();
-				Logger::logNotice( "PERIODIC_CHECK_IN packet sent" );
-				gettimeofday( &mCheckInTime, 0 );
-				}
-			
-			gettimeofday( &cCurrentTime, 0 );
-			if( ( cCurrentTime.tv_sec - cAudioTimeoutStartTime.tv_sec ) * 1000 
-			      + ( cCurrentTime.tv_usec - cAudioTimeoutStartTime.tv_usec ) / 1000 
-				  > PACKETRECEIPTTIMEOUT && cNextAudioTrackID != -1 )
-				{
-				int mTimeOut = ( cCurrentTime.tv_sec - cAudioTimeoutStartTime.tv_sec ) * 1000 
-								 + ( cCurrentTime.tv_usec - cAudioTimeoutStartTime.tv_usec ) / 1000;
-								 
-				sendMessageToServer( ControlBytes::RESEND_AUDIO, cNextAudioTrackID, cNextAudioSampleID,
-									 cNextAudioBufferRangeStartID, cNextAudioBufferRangeEndID );
 				
-				Logger::logWarning( "---AUDIOPACKET TIMEOUT---" );
-				Logger::logNotice( "Timeout: %d - AudioPacketCounter: %d", mTimeOut, cAudioPacketCounter );
-				Logger::logNotice( "Sent a RESEND_AUDIO packet to server." );
-				Logger::logWarning( "Resetting timeout" );
-				
-				gettimeofday( &cAudioTimeoutStartTime, 0 );
-				}
-				
-			gettimeofday( &cCurrentTime, 0 );
-			if( ( cCurrentTime.tv_sec - cVolumeTimeoutStartTime.tv_sec ) * 1000 
-			      + ( cCurrentTime.tv_usec - cVolumeTimeoutStartTime.tv_usec ) / 1000 
-				  > PACKETRECEIPTTIMEOUT && cNextVolumeTrackID != -1 )
-				{
-				int mTimeOut = ( cCurrentTime.tv_sec - cVolumeTimeoutStartTime.tv_sec ) * 1000 
-								 + ( cCurrentTime.tv_usec - cVolumeTimeoutStartTime.tv_usec ) / 1000;
-								 
-				sendMessageToServer( ControlBytes::RESEND_VOLUME, cNextVolumeTrackID, cNextVolumeSampleID,
-									 cNextVolumeBufferRangeStartID, cNextVolumeBufferRangeEndID );
-				
-				Logger::logWarning( "---VOLUMEPACKET TIMEOUT---" );
-				Logger::logNotice( "Timeout: %d - VolumePacketCounter: %d", mTimeOut, cVolumePacketCounter );
-				Logger::logNotice( "Sent a RESEND_VOLUME packet to server." );
-				Logger::logWarning( "Resetting timeout" );
-				
-				gettimeofday( &cVolumeTimeoutStartTime, 0 );
-				}
-			
 			mNewMessages = queueMessagesFromServer();
 			if( mNewMessages != 0 )
 				{
@@ -263,14 +203,6 @@ namespace Networking
 		}
 	
 	/*
-	This function sends a check in message to the server. Nothing else.
-	*/
-	void PlaybackClient::checkInWithServer()
-		{
-		sendMessageToServer( ControlBytes::PERIODIC_CHECK_IN );
-		}
-	
-	/*
 	Creates and sends messages to servers.
 	*/
 	int PlaybackClient::sendMessageToServer( const unsigned char aControlByte, 
@@ -303,7 +235,7 @@ namespace Networking
 				I didn't see and acknowledgment control byte, so I assume you reseond with the same type of byte you
 				are acknowledging.
 				*/
-				mMessage.TransportControl.clientID = stringToGuid( cBroadcastIP, cLocalIP );
+				//mMessage.TransportControl.clientID = stringToGuid( cBroadcastIP, cLocalIP );
 				mMessage.TransportControl.requestID = aRequestID;
 				
 				Logger::logNotice( "Created a TransportControl packet." );
@@ -313,7 +245,7 @@ namespace Networking
 				/*
 				All other client to server messages have the following data types
 				*/
-				mMessage.ClientCheckIn.clientID = stringToGuid( cBroadcastIP, cLocalIP );
+				//mMessage.ClientCheckIn.clientID = stringToGuid( cBroadcastIP, cLocalIP );
 				mMessage.ClientCheckIn.position.x = cXPosition;
 				mMessage.ClientCheckIn.position.y = cYPosition;
 				
@@ -334,12 +266,7 @@ namespace Networking
 		static MESSAGEPACKET *mPlaceHolder, mTempNetworkPacket;
 		static PacketStructures::NetworkMessage mTempNetworkMessage;
 		
-		//No messages
-		if( recieveMessageFromServer() == -1 )
-			{
-			return 0;
-			}
-				
+		recieveMessageFromServer(); 
 		
 		mPlaceHolder = &cIncomingMessage;
 		
@@ -357,7 +284,7 @@ namespace Networking
 				recieveMessageFromServer( mPlaceHolder->messageHeader.Extra._dataLength, mPlaceHolder->data );
 				memcpy( &mTempNetworkPacket, mPlaceHolder, 
 						sizeof( PacketStructures::NetworkMessage ) + mPlaceHolder->messageHeader.Extra._dataLength );
-				checkForDroppedPacketsAndAddPacketToList( mTempNetworkPacket );
+				AddAudioOrVolumePacketToList( mTempNetworkPacket );
 				break;
 			
 			case ControlBytes::BEGIN_PLAYBACK:
@@ -366,9 +293,6 @@ namespace Networking
 				Logger::logNotice( "Received a TransportControl packet." );
 				
 				changePlaybackStatus( mPlaceHolder->messageHeader.ControlByte );
-				sendMessageToServer( mPlaceHolder->messageHeader.ControlByte, 
-									0, 0, 0, 0, //placeholders to get to last field
-									mPlaceHolder->messageHeader.TransportControl.requestID );
 				break;
 				
 			default:
@@ -381,224 +305,67 @@ namespace Networking
 		return 1;
 		}
 		
-	int PlaybackClient::checkForDroppedPacketsAndAddPacketToList( MESSAGEPACKET aMessagePacket )
+	int PlaybackClient::AddAudioOrVolumePacketToList( MESSAGEPACKET aMessagePacket )
 		{
+		/*
+		Make all method variables class/state variables to improve packet dropped checks.
+		*/
+			
 		switch( aMessagePacket.messageHeader.ControlByte )
 			{
 			case ControlBytes::SENDING_AUDIO:
-				if( cNextAudioTrackID == -1 )
+				if( cFirstAudioPacket )
 					{
-					Logger::logNotice( "Successfully added an audio packet to queue when queue WAS empty" );
-					Logger::logNotice( "SampleID: %d - cNextAudioSampleID: %d", aMessagePacket.messageHeader.AudioSample.SampleID, cNextAudioSampleID );
-					Logger::logNotice( "TrackID: %d - cNextAudioTrackID: %d", aMessagePacket.messageHeader.AudioSample.TrackID, cNextAudioTrackID );
-					
-					cAudioPacketCounter = 0;
-					gettimeofday( &cAudioTimeoutStartTime, 0 );
-					
-					getExpectedPacketValues( aMessagePacket, &cNextAudioTrackID, &cNextAudioSampleID, 
-											&cNextAudioBufferRangeStartID, &cNextAudioBufferRangeEndID );
-					cAudioMessageList.push_back( aMessagePacket );
-					
+					cFirstAudioPacket = false;
+					checkForMissingAudioHeader( aMessagePacket );
 					}
-				else if( aMessagePacket.messageHeader.AudioSample.SampleID == cNextAudioSampleID
-						&& aMessagePacket.messageHeader.AudioSample.TrackID == cNextAudioTrackID )
+								
+				cAudioMessageList.push_back( aMessagePacket );
+				
+				if( !cIsAudioCaughtUp )
 					{
-					Logger::logNotice( "Successfully added an audio packet to queue when queue wasn't empty" );
-					Logger::logNotice( "SampleID: %d - cNextAudioSampleID: %d", aMessagePacket.messageHeader.AudioSample.SampleID, cNextAudioSampleID );
-					Logger::logNotice( "TrackID: %d - cNextAudioTrackID: %d", aMessagePacket.messageHeader.AudioSample.TrackID, cNextAudioTrackID );
-					
-					cAudioPacketCounter = 0;
-					gettimeofday( &cAudioTimeoutStartTime, 0 );
-					
-					getExpectedPacketValues( aMessagePacket, &cNextAudioTrackID, &cNextAudioSampleID, 
-											&cNextAudioBufferRangeStartID, &cNextAudioBufferRangeEndID );
-					cAudioMessageList.push_back( aMessagePacket );
-					
-					cAudioMessageListExtraPackets.sort();
-					while( !cAudioMessageListExtraPackets.empty() )
+					cAudioMessageList.sort();
+					if( aMessagePacket.messageHeader.AudioSample.TrackID == cNextAudioTrackID
+						&& aMessagePacket.messageHeader.AudioSample.SampleID == cNextAudioSampleID )
 						{
-						if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
-								< cNextAudioSampleID || cNextAudioTrackID > 
-								cAudioMessageListExtraPackets.front().messageHeader.AudioSample.TrackID )
-							{
-							Logger::logWarning( "I Poppped the Front of my extra audio list" );
-							cAudioMessageListExtraPackets.pop_front();
-							}
-						else if( cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID 
-								==  cNextAudioSampleID && cNextAudioTrackID ==
-								cAudioMessageListExtraPackets.front().messageHeader.AudioSample.TrackID )
-							{
-							Logger::logWarning( "I put the front of my extra list into the back of my regular list" );
-							getExpectedPacketValues( cAudioMessageListExtraPackets.front(), &cNextAudioTrackID, &cNextAudioSampleID, 
-													&cNextAudioBufferRangeStartID, &cNextAudioBufferRangeEndID );
-							
-							cAudioMessageList.push_back( cAudioMessageListExtraPackets.front() );
-							
-							cAudioMessageListExtraPackets.pop_front();
-							}
-						else
-							{
-							Logger::logWarning( "List from front to back" );
-							while( !cAudioMessageListExtraPackets.empty() )
-								{
-								Logger::logWarning( "Audiotrack: %d - AudioSample: %d",
-													cAudioMessageListExtraPackets.front().messageHeader.AudioSample.TrackID,
-													cAudioMessageListExtraPackets.front().messageHeader.AudioSample.SampleID );
-								cAudioMessageListExtraPackets.pop_front();
-								}
-							Logger::logWarning( "I BROKE UNDER THE PRESSURE" );
-							break;
-							}
-						}
-					}
-				else
-					{
-					Logger::logNotice( "---Failed to add to queue---" );
-					Logger::logNotice( "SampleID: %d - cNextAudioSampleID: %d", aMessagePacket.messageHeader.AudioSample.SampleID, cNextAudioSampleID );
-					Logger::logNotice( "TrackID: %d - cNextAudioTrackID: %d", aMessagePacket.messageHeader.AudioSample.TrackID, cNextAudioTrackID );
-					Logger::logNotice( "---Failed to add to queue---" );
-					
-					cAudioPacketCounter++;
-					cAudioMessageListExtraPackets.push_back( aMessagePacket );
-					}
-			
-				if( cNextAudioTrackID != -1 )
-					{
-					
-					if( cAudioPacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS ) 
-						{
-						sendMessageToServer( ControlBytes::RESEND_AUDIO, cNextAudioTrackID, cNextAudioSampleID,
-											 cNextAudioBufferRangeStartID, cNextAudioBufferRangeEndID );
-						
-						Logger::logWarning( "Too many packets have arrived out of order, need to initiate AUDIORESEND" );
-						Logger::logNotice( "AudioPacketCounter: %d", cAudioPacketCounter );
-						Logger::logNotice( "Sent a RESEND_AUDIO packet to server." );					
+						cIsAudioCaughtUp = true;
 						}
 					}
 				
+				Logger::logNotice( "Added audio packet to queue" );
 				break;
 			
 			default:
-				if( cNextVolumeTrackID == -1 )
-					{
-					Logger::logNotice( "Successfully added an audio packet to queue when queue WAS empty" );
-					Logger::logNotice( "SampleID: %d - cNextVolumeSampleID: %d", aMessagePacket.messageHeader.VolumeSample.SampleID, cNextVolumeSampleID );
-					Logger::logNotice( "TrackID: %d - cNextVolumeTrackID: %d", aMessagePacket.messageHeader.VolumeSample.TrackID, cNextVolumeTrackID );
-					
-					cVolumePacketCounter = 0;
-					gettimeofday( &cVolumeTimeoutStartTime, 0 );
-					
-					getExpectedPacketValues( aMessagePacket, &cNextVolumeTrackID, &cNextVolumeSampleID, 
-											&cNextVolumeBufferRangeStartID, &cNextVolumeBufferRangeEndID );
-					cVolumeMessageList.push_back( aMessagePacket );
-					
-					}
-				else if( aMessagePacket.messageHeader.VolumeSample.SampleID == cNextVolumeSampleID
-						&& aMessagePacket.messageHeader.VolumeSample.TrackID == cNextVolumeTrackID )
-					{
-					Logger::logNotice( "Successfully added an Volume packet to queue when queue wasn't empty" );
-					Logger::logNotice( "SampleID: %d - cNextVolumeSampleID: %d", aMessagePacket.messageHeader.VolumeSample.SampleID, cNextVolumeSampleID );
-					Logger::logNotice( "TrackID: %d - cNextVolumeTrackID: %d", aMessagePacket.messageHeader.VolumeSample.TrackID, cNextVolumeTrackID );
-					
-					cVolumePacketCounter = 0;
-					gettimeofday( &cVolumeTimeoutStartTime, 0 );
-					
-					getExpectedPacketValues( aMessagePacket, &cNextVolumeTrackID, &cNextVolumeSampleID, 
-											&cNextVolumeBufferRangeStartID, &cNextVolumeBufferRangeEndID );
-					cVolumeMessageList.push_back( aMessagePacket );
-					
-					cVolumeMessageListExtraPackets.sort();
-					while( !cVolumeMessageListExtraPackets.empty() )
-						{
-						if( cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
-								< cNextVolumeSampleID || cNextVolumeTrackID > 
-								cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.TrackID )
-							{
-							Logger::logWarning( "I Poppped the Front of my extra Volume list" );
-							cVolumeMessageListExtraPackets.pop_front();
-							}
-						else if( cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID 
-								==  cNextVolumeSampleID && cNextVolumeTrackID ==
-								cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.TrackID )
-							{
-							Logger::logWarning( "I put the front of my extra list into the back of my regular list" );
-							getExpectedPacketValues( cVolumeMessageListExtraPackets.front(), &cNextVolumeTrackID, &cNextVolumeSampleID, 
-													&cNextVolumeBufferRangeStartID, &cNextVolumeBufferRangeEndID );
-							
-							cVolumeMessageList.push_back( cVolumeMessageListExtraPackets.front() );
-							
-							cVolumeMessageListExtraPackets.pop_front();
-							}
-						else
-							{
-							Logger::logWarning( "List from front to back" );
-							while( !cVolumeMessageListExtraPackets.empty() )
-								{
-								Logger::logWarning( "Volumetrack: %d - VolumeSample: %d",
-													cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.TrackID,
-													cVolumeMessageListExtraPackets.front().messageHeader.VolumeSample.SampleID );
-								cVolumeMessageListExtraPackets.pop_front();
-								}
-							Logger::logWarning( "I BROKE UNDER THE PRESSURE" );
-							break;
-							}
-						}
-					}
-				else
-					{
-					Logger::logNotice( "---Failed to add to queue---" );
-					Logger::logNotice( "SampleID: %d - cNextVolumeSampleID: %d", aMessagePacket.messageHeader.VolumeSample.SampleID, cNextVolumeSampleID );
-					Logger::logNotice( "TrackID: %d - cNextVolumeTrackID: %d", aMessagePacket.messageHeader.VolumeSample.TrackID, cNextVolumeTrackID );
-					Logger::logNotice( "---Failed to add to queue---" );
-					
-					cVolumePacketCounter++;
-					cVolumeMessageListExtraPackets.push_back( aMessagePacket );
-					}
-			
-				if( cNextVolumeTrackID != -1 )
-					{
-					
-					if( cVolumePacketCounter > NUMBER_OF_ACCEPTABLE_EXTRA_PACKETS ) 
-						{
-						sendMessageToServer( ControlBytes::RESEND_VOLUME, cNextVolumeTrackID, cNextVolumeSampleID,
-											 cNextVolumeBufferRangeStartID, cNextVolumeBufferRangeEndID );
-						
-						Logger::logWarning( "Too many packets have arrived out of order, need to initiate VolumeRESEND" );
-						Logger::logNotice( "VolumePacketCounter: %d", cVolumePacketCounter );
-						Logger::logNotice( "Sent a RESEND_VOLUME packet to server." );					
-						}
-					}
-				
+				cVolumeMessageList.push_back( aMessagePacket );
+				Logger::logNotice( "Added volume packet to queue" );
 				break;
 			}
 		
 		return 0;
 		}
 		
-	void PlaybackClient::getExpectedPacketValues(	MESSAGEPACKET aMessagePacket,
-													Networking::trackid_t *aTrackID,
-													Networking::sampleid_t *aSampleID,
-													Networking::sampleid_t *aBufferRangeStartID,
-													Networking::sampleid_t *aBufferRangeEndID,
-													timeval *aTimeoutStartTime )
+	void PlaybackClient::checkForMissingAudioHeader( MESSAGEPACKET aMessagePacket )
 		{
-			
-		if( aMessagePacket.messageHeader.AudioSample.TrackID + 1 <= aMessagePacket.messageHeader.AudioSample.BufferRangeEndID )
+		if( aMessagePacket.messageHeader.AudioSample.SampleID != 0 )
 			{
-			*aTrackID = aMessagePacket.messageHeader.AudioSample.TrackID + 1;
-			*aSampleID = aMessagePacket.messageHeader.AudioSample.SampleID;
-			*aBufferRangeStartID = aMessagePacket.messageHeader.AudioSample.BufferRangeStartID;
-			*aBufferRangeEndID = aMessagePacket.messageHeader.AudioSample.BufferRangeEndID;
-			gettimeofday( aTimeoutStartTime, 0 );
+			for( int i = 0; i < AUDIOHEADERRANGE; ++i )
+				{
+				sendMessageToServer( ControlBytes::RESEND_AUDIO, 
+									aMessagePacket.messageHeader.AudioSample.TrackID,
+									i,
+									aMessagePacket.messageHeader.AudioSample.BufferRangeStartID, 
+									aMessagePacket.messageHeader.AudioSample.BufferRangeEndID );
+				cNextAudioSampleID = i;
+				}
+			
+			cNextAudioTrackID = aMessagePacket.messageHeader.AudioSample.TrackID;
 			}
 		else
 			{
-			*aTrackID = -1;
-			*aSampleID = -1;
-			*aBufferRangeStartID = -1;
-			*aBufferRangeEndID = -1;
+			cIsAudioCaughtUp = true;
 			}
 		}
+		
 	}
 	
 void handleCtrlCSignal( int aPlaceholder )
@@ -625,5 +392,3 @@ int main( int argc, char **argv )
 	
 	return 0;
 	}
-
-#endif

@@ -1,6 +1,6 @@
 #pragma once
 
-#ifndef RASPBERRY_PI
+#ifndef __GNUC__
 
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -61,7 +61,7 @@ namespace Networking {
 		//The Internet Protocol version 4 (IPv4) address family.
 		IPv4 = AF_INET,
 		//The NetBIOS address family. This address family is only supported if a Windows Sockets provider for NetBIOS is installed.
-		#ifndef RASPBERRY_PI
+		#ifndef __GNUC__
 		NetBIOS = AF_NETBIOS,
 		#else
 		NetBIOS = AF_INET6,
@@ -71,7 +71,7 @@ namespace Networking {
 		//The Infrared Data Association (IrDA) address family. This address family is only supported if the computer has an infrared port and driver installed.
 		InfraredDataAssociation = AF_IRDA,
 		//The Bluetooth address family. This address family is only supported if a Bluetooth adapter is installed on Windows Server 2003 or later.
-		#ifndef RASPBERRY_PI
+		#ifndef __GNUC__
 		Bluetooth = AF_BTH
 		#else
 		Bluetooth = 32
@@ -117,7 +117,7 @@ namespace Networking {
 
 	public:
 
-		#ifndef RASPBERRY_PI
+		#ifndef __GNUC__
 		// Winsock data
 		WSADATA wsaData;
 		#endif
