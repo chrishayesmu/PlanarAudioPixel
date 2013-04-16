@@ -15,6 +15,18 @@ namespace PlanarAudioPixel {
 	static void clientConnectedChain(Networking::Client c) {
 		Client clientChain;
 		clientChain.ClientID.LocalIP.RawIP = c.ClientID;
+
+		uint32_t rawIP = c.ClientID;
+		uint32_t byteMask = 0x000000FF;
+		clientChain.ClientID.LocalIP.Byte1 = (rawIP & byteMask);
+		rawIP >>= 8;
+		clientChain.ClientID.LocalIP.Byte2 = (rawIP & byteMask);
+		rawIP >>= 8;
+		clientChain.ClientID.LocalIP.Byte3 = (rawIP & byteMask);
+		rawIP >>= 8;
+		clientChain.ClientID.LocalIP.Byte4 = (rawIP & byteMask);
+
+
 		clientChain.Offset.x = c.Offset.x;
 		clientChain.Offset.y = c.Offset.y;
 
@@ -34,7 +46,8 @@ namespace PlanarAudioPixel {
 	PlaybackServer::PlaybackServer(){
 
 		Networking::PlaybackServer* server;
-		if (SOCKETFAILED(Networking::PlaybackServer::Create(&server))){
+		int test;
+		if (SOCKETFAILED(test = Networking::PlaybackServer::Create(&server))){
 			throw gcnew Exception(L"Could not create the playback server.");
 		}
 
@@ -146,12 +159,6 @@ namespace PlanarAudioPixel {
 	///<param name="callback">A pointer to the function to call when the event is raised.</param>
 	void PlaybackServer::OnClientDisconnected(ClientDisconnectedCallback^ callback) {
 		PlaybackServer::_ClientDisconnectedCallbacks->Add(callback);
-	}
-
-	///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
-	///<param name="callback">A pointer to the function to call when the event is raised.</param>
-	void PlaybackServer::OnClientCheckIn(ClientCheckInCallback^ callback) {
-		PlaybackServer::_ClientCheckInCallbacks->Add(callback);
 	}
 
 

@@ -60,10 +60,10 @@ int sockets_accept(_socket* s, int timeout){
 	return accept(s->sfd, s->CONNECTED_ADDRESS, &s->CONNECTED_ADDRESS_LENGTH);
 }
 
-int sockets_send_message(_socket* __restrict s, const void* __restrict data, size_t size) {
-	return write(s->sfd, data, size);
+int sockets_send_message(int sfd, const void* __restrict data, size_t size) {
+	return sendto(sfd, (const char*)data, size, 0, NULL, NULL);
 }
 
-int sockets_receive_message(_socket* __restrict s, void* __restrict data, size_t size) {
-	return read(s->sfd, data, size);
+int sockets_receive_message(int sfd, void* __restrict data, size_t size) {
+	return recvfrom(sfd, (char*)data, size, 0, NULL, NULL);
 }

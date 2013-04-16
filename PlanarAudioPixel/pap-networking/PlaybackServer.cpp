@@ -24,13 +24,24 @@ namespace Networking {
 			if (!audioFile) 
 			{
 				Logger::logWarning("Failed to open audio file %s", filename);
-				return PlaybackServerErrorCodes::PlaybackServer_FILE;
+				return -1;
 			}
 
-			// TODO - actually read from file
+			char* dataBuffer[1468];
+			uint32_t readCount = 0;
+			int ID = 0;
+			uint32_t readTotal = 0;
+			do {
+				readCount = fread((void*)dataBuffer, 1, 1468, audioFile);
+				memcpy(buffer[ID].Data.Data, dataBuffer, readCount);
+				buffer[ID].Data.DataLength = readCount;
+				buffer[ID].SampleID = ID;
+				++ID;
+				readTotal += readCount;
+			} while (readCount == 1468);
 
 			Logger::logNotice("Successfully read audio file %s", filename);
-			return PlaybackServerErrorCodes::PlaybackServer_OK;
+			return (int)readTotal;
 		}
 
 		///<summary>Reads position data from the file and fills a PositionBuffer.</summary>
@@ -119,16 +130,18 @@ namespace Networking {
 		void PlaybackServer::broadcastMessage(const void* __restrict data, int size) {
 			//Broadcast the message
 			for (ClientIterator i = this->clients.begin(); i != this->clients.end(); ++i) {
-				if (!sockets_send_message(
+				int sendSize = 0;
+				if ((sendSize = sockets_send_message(
 						i->second.s,
 						data,
-						size)) {
+						size)) == -1) {
 					//If the send size was 0, assume the socket connection was dropped
 					for (unsigned int j = 0; j < this->clientConnectedCallbacks.size(); ++j) {
 						this->clientDisconnectedCallbacks[j](i->first);
 					}
 
 				}
+				if (!sendSize) printf("fuck");
 			}									
 		}
 
@@ -139,9 +152,7 @@ namespace Networking {
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffer range currently being delivered.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
 		void PlaybackServer::sendAudioSample(trackid_t trackID, AudioSample sampleBuffer, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID){
-			
-					/// ----- THIS NEEDS TO BE BROADCAST ------
-
+		
 			// TODO - log buffer start/end? Not clear on what these things are
 			Logger::logNotice("Sending audio sample; trackID: %d; sampleID: %d", trackID, sampleBuffer.SampleID);
 
@@ -154,8 +165,7 @@ namespace Networking {
 			audioSampleMessage.networkHeader.ControlByte = ControlBytes::SENDING_AUDIO;
 			audioSampleMessage.networkHeader.AudioSample.SampleID = sampleBuffer.SampleID;
 			audioSampleMessage.networkHeader.AudioSample.TrackID = trackID;
-			audioSampleMessage.networkHeader.AudioSample.BufferRangeStartID = bufferRangeStartID;
-			audioSampleMessage.networkHeader.AudioSample.BufferRangeEndID = bufferRangeEndID;
+			audioSampleMessage.networkHeader.AudioSample.fileSize = this->tracks[trackID].fileSize;
 
 			//Assume that the function constructing the sample buffer behaved well and didn't produce a sample with greater than 1468 bytes.
 			memcpy(audioSampleMessage.data, sampleBuffer.Data.Data, sampleBuffer.Data.DataLength);
@@ -187,10 +197,8 @@ namespace Networking {
 			} volumeDataMessage;
 
 			volumeDataMessage.networkHeader.ControlByte = ControlBytes::SENDING_VOLUME;
-			volumeDataMessage.networkHeader.AudioSample.SampleID = sampleID;
-			volumeDataMessage.networkHeader.AudioSample.TrackID = trackID;
-			volumeDataMessage.networkHeader.AudioSample.BufferRangeStartID = bufferRangeStartID;
-			volumeDataMessage.networkHeader.AudioSample.BufferRangeEndID = bufferRangeEndID;
+			volumeDataMessage.networkHeader.VolumeSample.SampleID = sampleID;
+			volumeDataMessage.networkHeader.VolumeSample.TrackID = trackID;
 
 			//Include the number of clients contained in this volume data message.
 			volumeDataMessage.networkHeader.Extra._dataLength = volumeData.size();
@@ -231,8 +239,7 @@ namespace Networking {
 			
 			if (this->clients.find(ID) != this->clients.end()) {
 				sockets_send_message(this->clients[ID].s, &disconnectMessage, sizeof(PacketStructures::NetworkMessage));
-				close(this->clients[ID].s->sfd);
-				free(this->clients[ID].s);
+				closesocket(this->clients[ID].s);
 				this->clients.erase(this->clients.find(ID));
 
 				//Send the disconnect message
@@ -251,16 +258,16 @@ namespace Networking {
 			while (this->state != PlaybackServerStates::PlaybackServer_STOPPED) {
 				
 				//Attempt to connect new clients for up to 1 second. Timeouts give the server a chance to evaluate state.
-				_socket* newClient = (_socket*)calloc(1, sizeof(_socket));
-				if (sockets_accept(newClient, 1000) != -1) {
+				int acceptClient;
+				if ((acceptClient = sockets_accept(this->serverSocket, 1000)) != -1) {
 					
 					PacketStructures::NetworkMessage connectMessage;
-					sockets_receive_message(newClient, &connectMessage, sizeof(connectMessage));
+					sockets_receive_message(acceptClient, &connectMessage, sizeof(connectMessage));
 
 					Client c;
 					c.ClientID = connectMessage.ClientConnection.clientID;
 					c.Offset = connectMessage.ClientConnection.position;
-					c.s = newClient;
+					c.s = acceptClient;
 
 					this->clients[c.ClientID] = c;
 
@@ -269,8 +276,6 @@ namespace Networking {
 						this->clientConnectedCallbacks[j](c);
 					}
 
-				} else {
-					free(newClient);
 				}
 
 			}
@@ -286,7 +291,6 @@ namespace Networking {
 		void PlaybackServer::serverMain(){
 			this->playbackState = PlaybackStates::Playback_STOPPED;
 
-			Logger::openLogFile();
 			Logger::logNotice("Starting playback server");
 
 			do {
@@ -354,22 +358,22 @@ namespace Networking {
 						this->sendAudioSample(bufferTrackID, 
 												this->tracks[bufferTrackID].audioSamples[i],
 												beginBufferRange, endBufferRange);
-						this->sendVolumeData(bufferTrackID,
-												i, this->tracks[bufferTrackID].volumeData[i],
-												beginBufferRange, endBufferRange);
+						//this->sendVolumeData(bufferTrackID,
+						//						i, this->tracks[bufferTrackID].volumeData[i],
+						//						beginBufferRange, endBufferRange);
 					}
 
 					Networking::busyWait(Networking::ClientReceivedPacketTimeout);
 
 					//Repost the buffering request until all packets have been buffered.
-					if (endBufferRange == Networking::RequiredBufferedSamplesCount){
+					if (endBufferRange < this->tracks[bufferTrackID].audioSamples.size()){
 						PlaybackServerRequestData bufferRequestData;
 						bufferRequestData.bufferInfo.trackID			= bufferTrackID;
 						bufferRequestData.bufferInfo.beginBufferRange	= endBufferRange;
 						bufferRequestData.bufferInfo.endBufferRange		= endBufferRange + Networking::ContinuousBufferCount;
 
 						if (bufferRequestData.bufferInfo.endBufferRange > tracks[bufferTrackID].audioSamples.size())
-							bufferRequestData.bufferInfo.endBufferRange = tracks[bufferTrackID].audioSamples.size() - endBufferRange;
+							bufferRequestData.bufferInfo.endBufferRange = tracks[bufferTrackID].audioSamples.size();
 
 						this->queueRequest(PlaybackServerRequestCode::PlaybackServer_BUFFER, bufferRequestData);
 					}
@@ -395,7 +399,7 @@ namespace Networking {
 							//Add each sample as "not needing to be resent"
 							for (unsigned int j = 0; j < trackBufferSize; ++j) {
 								this->sendAudioSample(i, tracks[i].audioSamples[j], 0, trackBufferSize);
-								this->sendVolumeData(i, j, tracks[i].volumeData[j], 0, trackBufferSize);
+								//this->sendVolumeData(i, j, tracks[i].volumeData[j], 0, trackBufferSize);
 							}
 
 							if (trackBufferSize == Networking::RequiredBufferedSamplesCount){
@@ -506,7 +510,7 @@ namespace Networking {
 				case PlaybackServerRequestCodes::PlaybackServer_NEW_TRACK:
 					
 					TrackInfo newTrack;
-					newTrack.TrackID = this->tracks.size() + 1;
+					newTrack.TrackID = this->tracks.size();
 					
 					//Read the audio file
 					int audioCode = this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioSamples);
@@ -516,8 +520,12 @@ namespace Networking {
 					//Set the length of the track
 					newTrack.trackLength = newTrack.audioSamples.size() * 100000;
 
+					newTrack.fileSize = audioCode;
+
 					if (request.controlData.newTrackInfo.callback)
 						request.controlData.newTrackInfo.callback(audioCode, positionCode, request.controlData.newTrackInfo.token);
+
+					this->tracks[newTrack.TrackID] = newTrack;
 
 					break;
 				}
@@ -640,6 +648,8 @@ namespace Networking {
 		///<summary>Attempts to start the PlaybackServer.</summary>
 		///<returns>A PlaybackServerErrorCode indicating the result of this call.</returns>
 		PlaybackServerErrorCode PlaybackServer::ServerStart(){
+			
+			Logger::openLogFile();
 
 			//god I hate the stl
 			std::queue<PlaybackServerRequest> emptyMessageQueue;
@@ -747,6 +757,9 @@ namespace Networking {
 		///<param name="fillServer">A reference to the PlaybackServer object to fill.</param>
 		///<returns>A Networking::SocketErrorCode.</returns>
 		int PlaybackServer::Create(PlaybackServer** fillServer){
+
+			WSADATA wsaData;
+			WSAStartup(MAKEWORD(2,2), &wsaData);
 			
 			//Check the pointer, and initialize to NULL
 			if (!fillServer) return Networking::SocketErrorCode::SocketError_POINTER;

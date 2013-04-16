@@ -32,10 +32,6 @@ namespace PlanarAudioPixel {
 	public delegate void ClientDisconnectedCallback(Client c);
 	static void clientDisconnectedChain(Networking::Client c);
 
-	public delegate void ClientCheckInCallback(Client c);
-	static void clientCheckInChain(Networking::Client c);
-
-
 	///<summary>Main interface class to access lower level Networking::PlaybackServer.</summary>
 	public ref class PlaybackServer {
 	private:
@@ -49,7 +45,6 @@ namespace PlanarAudioPixel {
 
 		static System::Collections::Generic::List<ClientConnectedCallback^>^ _ClientConnectedCallbacks = gcnew System::Collections::Generic::List<ClientConnectedCallback^>();
 		static System::Collections::Generic::List<ClientDisconnectedCallback^>^ _ClientDisconnectedCallbacks = gcnew System::Collections::Generic::List<ClientDisconnectedCallback^>();
-		static System::Collections::Generic::List<ClientCheckInCallback^>^ _ClientCheckInCallbacks = gcnew System::Collections::Generic::List<ClientCheckInCallback^>();
 
 		///<summary>Constructs a playback server foreign function interface class.</summary>
 		PlaybackServer();
@@ -90,10 +85,6 @@ namespace PlanarAudioPixel {
 		///<summary>Subscribes the caller to the ClientDisconnected event. ClientDisconnected is raised when a client disconnects from the network.</summary>
 		///<param name="callback">A pointer to the function to call when the event is raised.</param>
 		void OnClientDisconnected(ClientDisconnectedCallback^ callback);
-
-		///<summary>Subscribes the caller to the ClientCheckIn event. ClientCheckIn is raised when a client checks in to the network.</summary>
-		///<param name="callback">A pointer to the function to call when the event is raised.</param>
-		void OnClientCheckIn(ClientCheckInCallback^ callback);
 
 	};
 	

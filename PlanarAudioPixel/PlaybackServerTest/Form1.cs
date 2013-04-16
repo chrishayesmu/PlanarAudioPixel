@@ -17,23 +17,25 @@ namespace PlaybackServerTest
 
         PlaybackServer playbackServer = new PlaybackServer();
 
+        private void updateConnectedClients(PlanarAudioPixel.Client client)
+        {
+            listBox1.Items.Add("" + client.ClientID.LocalIP.Byte1 + "." + client.ClientID.LocalIP.Byte2 + "." + client.ClientID.LocalIP.Byte3 + "." + client.ClientID.LocalIP.Byte4);
+        }
+        delegate void updateClientGUI(PlanarAudioPixel.Client client);
+
         private void trackAdded(int audioCode, int positionCode)
         {
             MessageBox.Show("Tracks: " + audioCode.ToString() + " " + positionCode);
         }
         private void clientConnected(PlanarAudioPixel.Client client)
         {
-            MessageBox.Show("" + client.ClientID + "(" + client.Offset.x + ", " + client.Offset.y + ")");
+            updateClientGUI updateDelegate = updateConnectedClients;
+            this.Invoke(updateDelegate, new object[] { client });
         }
         private void clientDisconnected(PlanarAudioPixel.Client client)
         {
             MessageBox.Show("" + client.ClientID);
         }
-        private void clientCheckin(PlanarAudioPixel.Client client)
-        {
-            listBox1.Items.Add("" + client.ClientID);
-        }
-        
 
         public Form1()
         {
@@ -50,7 +52,6 @@ namespace PlaybackServerTest
 
                 playbackServer.OnClientConnected(clientConnected);
                 playbackServer.OnClientDisconnected(clientDisconnected);
-                playbackServer.OnClientCheckIn(clientCheckin);
             }
             catch (Exception ex)
             {
@@ -81,6 +82,18 @@ namespace PlaybackServerTest
             {
                 playbackServer.AddTrack(textBox1.Text, textBox2.Text, trackAdded);
                 MessageBox.Show("Track was added!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+        }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                playbackServer.Play();
             }
             catch (Exception ex)
             {

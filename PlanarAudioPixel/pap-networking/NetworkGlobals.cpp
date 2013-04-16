@@ -13,7 +13,7 @@ namespace Networking
 
 	unsigned int RequiredBufferedSamplesCount = 150;
 
-	unsigned int ContinuousBufferCount = 10;
+	unsigned int ContinuousBufferCount = 100;
 
 	time_t ClientReceivedPacketTimeout = 200000;
 

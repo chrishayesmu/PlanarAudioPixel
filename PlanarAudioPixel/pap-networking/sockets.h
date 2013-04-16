@@ -62,9 +62,9 @@ _socket* sockets_connect_to(char* __restrict hostname, unsigned short port);
 //AND FILLS OUT CONNECTED SOCKET INFORMATION IN s
 int sockets_accept(_socket* __restrict s, int timeout);
 
-int sockets_send_message(_socket* __restrict s, const void* __restrict data, size_t size);
+int sockets_send_message(int sfd, const void* __restrict data, size_t size);
 
-int sockets_receive_message(_socket* __restrict s, void* __restrict data, size_t size);
+int sockets_receive_message(int sfd, void* __restrict data, size_t size);
 
 
 #endif

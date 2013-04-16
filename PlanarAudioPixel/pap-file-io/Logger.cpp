@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <exception>
 #endif // PAP_NO_LOGGING
 
 #ifdef _WIN32
@@ -152,11 +153,16 @@ namespace Logger
 			throw "Attempted to write log with no log file open!";
 		
 		char dateBuffer[24];
-		char logFormatBuffer[2000]; // allocate lots of buffer room because why the hell not
+		char logFormatBuffer[1000]; // allocate lots of buffer room because why the hell not
 
 		// Retrieve the time then convert it into a date
 		time_t curTime;
+		try {
 		curTime = time(NULL);
+		} catch(std::exception const&  e) {
+			int a  =0;
+			a = 4;
+		}
 		tm* curDate = localtime(&curTime);
 
 		// Format the date appropriately

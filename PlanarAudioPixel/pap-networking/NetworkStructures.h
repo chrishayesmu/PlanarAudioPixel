@@ -70,7 +70,7 @@ namespace Networking
 		PositionInfo Offset;
 
 		// The associated TCP socket
-		_socket* s;
+		int s;
 	};
 
 	typedef uint32_t trackid_t;
@@ -132,6 +132,9 @@ namespace Networking
 		// A buffer for the volume data for this track.
 		VolumeBuffer volumeData;
 
+		// The length of the file, in bytes
+		uint32_t fileSize;
+
 	};
 
 	// A typedef for a TrackBuffer object, which is a map between track IDs and
@@ -191,18 +194,9 @@ namespace Networking
 				struct {
 					/* [4] */ trackid_t TrackID;
 					/* [4] */ sampleid_t SampleID;
-					/* [4] */ sampleid_t BufferRangeStartID;
-					/* [4] */ sampleid_t BufferRangeEndID;
+					/* [4] */ uint32_t fileSize;
+					/* [4] */ uint32_t _unused;
 				} AudioSample;
-				
-				// [16] Client to Server - Audio sample resend request
-				struct {
-					// The ID of the track and the ID of the sample that is to be resent
-					/* [4] */ trackid_t TrackID;
-					/* [4] */ sampleid_t SampleID;
-					/* [4] */ sampleid_t BufferRangeStartID;
-					/* [4] */ sampleid_t BufferRangeEndID;
-				} AudioResendRequest;
 				
 				// [16] Server to Clients - Volume sample header
 				struct {
@@ -211,15 +205,6 @@ namespace Networking
 					/* [4] */ sampleid_t BufferRangeStartID;
 					/* [4] */ sampleid_t BufferRangeEndID;
 				} VolumeSample;
-				
-				// [16] Client to Server - Audio sample resend request
-				struct {
-					// The ID of the track and the ID of the sample that is to be resent
-					/* [4] */ trackid_t TrackID;
-					/* [4] */ sampleid_t SampleID;
-					/* [4] */ sampleid_t BufferRangeStartID;
-					/* [4] */ sampleid_t BufferRangeEndID;
-				} VolumeResendRequest;
 
 				// [16] Transport controls
 				union {

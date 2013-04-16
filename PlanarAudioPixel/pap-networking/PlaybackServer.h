@@ -133,7 +133,7 @@ namespace Networking {
 		///<summary>Reads audio data from the file and fills an AudioBuffer.</summary>
 		///<param name="filename">The name of the audio file.</param>
 		///<param name="buffer">The buffer to fill.</param>
-		///<returns>TODO: Integer return code specifying the result of the call.</returns>
+		///<returns>Size of the file that was read in.</returns>
 		int readAudioDataFromFile(char* filename, AudioBuffer& buffer);
 
 		///<summary>Reads position data from the file and fills a PositionBuffer.</summary>

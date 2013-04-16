@@ -11,6 +11,8 @@ namespace PlanarAudioPixel {
 		// The 4-byte IP address, stored as an integer.
 		uint32_t RawIP;
 
+		uint8_t Byte1, Byte2, Byte3, Byte4;
+
 	};
 
 	// A struct for representing positions, for compactness and in case we need
