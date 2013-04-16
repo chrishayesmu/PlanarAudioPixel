@@ -173,6 +173,9 @@ namespace Logger
 
 		// Write to file using the new format string
 		vfprintf(Logger::logFilePtr, logFormatBuffer, args);
+#ifndef PAP_NO_STDOUT
+		vfprintf(stdout, logFormatBuffer, args);
+#endif
 #endif
 	}
 }

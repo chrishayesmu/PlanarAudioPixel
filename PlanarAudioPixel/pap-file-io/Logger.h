@@ -1,7 +1,8 @@
 // -------------------------------------------------------------------
 // This file defines a number of functions which are used for logging
 // system messages. Messages are automatically dated and timestamped
-// when logged. There are three types of messages:
+// when logged. The log messages are sent both to stdout and to a log
+// file. There are three types of messages:
 //
 // Notices  - These are messages of routine events, such as a client
 //            connection or disconnection, or of playback starting.
@@ -25,7 +26,8 @@
 //
 // For production use, if logging is not desired, then the symbol PAP_NO_LOGGING
 // may be defined to disable logging. All functions will continue to be defined 
-// but will have no effect (and likely be compiled out).
+// but will have no effect (and likely be compiled out). If logging to a file should
+// be used but outputting to stdout should not, you can define PAP_NO_STDOUT.
 //
 // Logging is potentially vulnerable to buffer overflows, especially if some user
 // attempts to open a file with an incredibly long name and that file's name is
