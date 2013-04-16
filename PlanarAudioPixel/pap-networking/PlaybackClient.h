@@ -1,5 +1,4 @@
-#ifndef PLAYBACKCLIENT
-#define PLAYBACKCLIENT
+#ifdef PLAYBACKCLIENT
 
 #include "../pap-file-io/Logger.h"
 #include "NetworkStructures.h"

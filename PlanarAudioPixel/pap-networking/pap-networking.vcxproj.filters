@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="pap-audio-player">
+      <UniqueIdentifier>{f617d911-80be-4353-8730-5b37a233ba3f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Socket.h">
@@ -39,6 +42,12 @@
     <ClInclude Include="sockets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PapAudioPlayer.hpp">
+      <Filter>pap-audio-player</Filter>
+    </ClInclude>
+    <ClInclude Include="sf_virtual_wrapper.h">
+      <Filter>pap-audio-player</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Socket.cpp">
@@ -58,6 +67,12 @@
     </ClCompile>
     <ClCompile Include="sockets.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PapAudioPlayer.cpp">
+      <Filter>pap-audio-player</Filter>
+    </ClCompile>
+    <ClCompile Include="sf_virtual_wrapper.c">
+      <Filter>pap-audio-player</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
