@@ -409,7 +409,7 @@ namespace Networking {
 								bufferRequestData.bufferInfo.endBufferRange		= trackBufferSize + Networking::ContinuousBufferCount;
 
 								if (bufferRequestData.bufferInfo.endBufferRange > tracks[i].audioSamples.size())
-									bufferRequestData.bufferInfo.endBufferRange = tracks[i].audioSamples.size() - trackBufferSize;
+									bufferRequestData.bufferInfo.endBufferRange = tracks[bufferTrackID].audioSamples.size();
 
 								this->queueRequest(PlaybackServerRequestCode::PlaybackServer_BUFFER, bufferRequestData);
 							}
