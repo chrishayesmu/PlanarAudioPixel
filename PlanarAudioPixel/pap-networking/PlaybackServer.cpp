@@ -27,18 +27,18 @@ namespace Networking {
 				return -1;
 			}
 
-			char* dataBuffer[1468];
+			char* dataBuffer[Networking::SampleSize];
 			uint32_t readCount = 0;
 			int ID = 0;
 			uint32_t readTotal = 0;
 			do {
-				readCount = fread((void*)dataBuffer, 1, 1468, audioFile);
+				readCount = fread((void*)dataBuffer, 1, Networking::SampleSize, audioFile);
 				memcpy(buffer[ID].Data.Data, dataBuffer, readCount);
 				buffer[ID].Data.DataLength = readCount;
 				buffer[ID].SampleID = ID;
 				++ID;
 				readTotal += readCount;
-			} while (readCount == 1468);
+			} while (readCount == (Networking::SampleSize));
 
 			Logger::logNotice("Successfully read audio file %s", filename);
 			return (int)readTotal;
@@ -159,7 +159,7 @@ namespace Networking {
 			//Define a struct capable of containing both the network message and the buffer data.
 			struct {
 				PacketStructures::NetworkMessage networkHeader;
-				char data[1500-32];
+				char data[Networking::SampleSize];
 			} audioSampleMessage;
 
 			audioSampleMessage.networkHeader.ControlByte = ControlBytes::SENDING_AUDIO;
@@ -325,22 +325,6 @@ namespace Networking {
 				//Process timer tick events
 				case PlaybackServerRequestCodes::PlaybackServer_TIMER_TICK:
 
-					if (this->playbackState == PlaybackStates::Playback_PLAYING) {
-
-						//Check to see if all tracks have ended
-						bool ended = true;
-						for (unsigned int i = 0; i < tracks.size(); ++i){
-							if ((getMicroseconds() - tracks[i].playbackRemainingTime) < tracks[i].playbackOriginOffset) {
-								ended = false;
-								break;
-							}
-						}
-						if (ended) {
-							//Tracks have ended - Send a stop request
-							this->queueRequest(PlaybackServerRequestCode::PlaybackServer_STOP);
-						}
-
-					}
 
 					//Indicate that this timer tick was consumed
 					this->timerTicked = false;
@@ -361,9 +345,9 @@ namespace Networking {
 						//this->sendVolumeData(bufferTrackID,
 						//						i, this->tracks[bufferTrackID].volumeData[i],
 						//						beginBufferRange, endBufferRange);
+						Networking::busyWait(1000);
 					}
-
-					Networking::busyWait(Networking::ClientReceivedPacketTimeout);
+					Networking::busyWait(10000);
 
 					//Repost the buffering request until all packets have been buffered.
 					if (endBufferRange < this->tracks[bufferTrackID].audioSamples.size()){

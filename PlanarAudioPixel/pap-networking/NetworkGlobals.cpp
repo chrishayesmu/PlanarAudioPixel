@@ -7,11 +7,11 @@
 
 namespace Networking
 {
-	std::map<ClientGUID, Client> ClientInformationTable;
+	//std::map<ClientGUID, Client> ClientInformationTable;
 
 	unsigned short NetworkPort = 32746;
 
-	unsigned int RequiredBufferedSamplesCount = 150;
+	unsigned int RequiredBufferedSamplesCount = 1;
 
 	unsigned int ContinuousBufferCount = 100;
 

@@ -34,7 +34,6 @@ namespace PlaybackServerTest
         }
         private void clientDisconnected(PlanarAudioPixel.Client client)
         {
-            MessageBox.Show("" + client.ClientID);
         }
 
         public Form1()
