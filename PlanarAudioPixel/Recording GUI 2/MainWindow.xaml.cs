@@ -61,7 +61,6 @@ namespace Recording_GUI_2
             Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
             string mousePositionString = mousePosition.ToString();
                     
-            //MessageBoxResult result = MessageBox.Show(mousePosition);
             if (mousePositionFileString != "")
             {
                 mousePositionFileString += ";\n " + mousePositionString;
@@ -74,10 +73,8 @@ namespace Recording_GUI_2
         
         private void StartTimer()
         {
-            timelineSlider.Value = 0.0;
-            //timer.Interval = TimeSpan.FromSeconds(timelineSlider.TickFrequency);
             timer.Tick += new EventHandler(timer_Tick);
-            //50 millisecond inte.rval
+            //50 millisecond interval
             timer.Interval = new TimeSpan(0, 0, 0, 0, 50);
             timer.Start();
         }
@@ -86,54 +83,9 @@ namespace Recording_GUI_2
         {
             timer.Stop();
         }
-        
-        //Slider Controls
-        /*
-         *      http://msdn.microsoft.com/en-us/library/windows/apps/xaml/hh986967.aspx
-         * 
-        */
-        /*private double SliderFrequency(TimeSpan timevalue)
-        {
-            double stepfrequency = -1;
-
-            double absvalue = (int)Math.Round(
-                timevalue.TotalSeconds, MidpointRounding.AwayFromZero);
-
-            stepfrequency = (int)(Math.Round(absvalue / 100));
-
-            if (timevalue.TotalMinutes >= 10 && timevalue.TotalMinutes < 30)
-            {
-                stepfrequency = 10;
-            }
-            else if (timevalue.TotalMinutes >= 30 && timevalue.TotalMinutes < 60)
-            {
-                stepfrequency = 30;
-            }
-            else if (timevalue.TotalHours >= 1)
-            {
-                stepfrequency = 60;
-            }
-
-            if (stepfrequency == 0) stepfrequency += 1;
-
-            if (stepfrequency == 1)
-            {
-                stepfrequency = absvalue / 100;
-            }
-
-            return stepfrequency;
-        }*/
 
         public void audioMediaElement_MediaOpened(Object sender, RoutedEventArgs e) {
-            //MessageBoxResult results = MessageBox.Show(audioMediaElement.Position.ToString());
-            
-            //Start the slider
-            //double absvalue = (int)Math.Round(audioMediaElement.NaturalDuration.TimeSpan.TotalSeconds, MidpointRounding.AwayFromZero);
-
             audioMediaElementLength.Content = audioMediaElement.NaturalDuration.TimeSpan;
-            
-            //timelineSlider.Maximum = absvalue;
-            //timelineSlider.TickFrequency = SliderFrequency(audioMediaElement.NaturalDuration.TimeSpan);
         }
 
         //Called when the audio has finished playing
@@ -141,15 +93,28 @@ namespace Recording_GUI_2
         public void audioMediaElement_MediaEnded(object sender, RoutedEventArgs e)
         {
             StopTimer();
-            //Reset the slider to 0
-            timelineSlider.Value = 0.0;
+            string path = "";
 
-            //Write the mouse position data to the file
-            string mydocpath = "C:\\Users\\Ryan\\Documents\\GitHub\\PlanarAudioPixel\\PlanarAudioPixel\\Recording GUI 2\\bin";
-            //MessageBoxResult resultss = MessageBox.Show(mydocpath);
-            string filenameNoExt = System.IO.Path.GetFileNameWithoutExtension(filename);
-            string fullPath = mydocpath + @"\" + filenameNoExt + "_path.txt";
-            using (StreamWriter outfile = new StreamWriter(fullPath, false))
+            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog();
+            dlg.FileName = "Path";
+            dlg.DefaultExt = ".text";
+            dlg.Filter = "Text documents (.txt)|*.txt";
+
+            // Show save file dialog box
+            Nullable<bool> result = dlg.ShowDialog();
+
+            // Process save file dialog box results
+            if (result == true)
+            {
+                // Save document
+                path = dlg.FileName;
+            }
+            else
+            {
+                MessageBoxResult results = MessageBox.Show("File not saved.");
+            }
+
+            using (StreamWriter outfile = new StreamWriter(path, false))
             {
                 if (mousePositionFileString != null)
                 {
@@ -161,7 +126,7 @@ namespace Recording_GUI_2
                 }
             }
 
-            MessageBoxResult results = MessageBox.Show("Finished recording audio path.\n File: " + fullPath);
+            MessageBoxResult pathResults = MessageBox.Show("Finished recording audio path.\n File: " + path);
         }
 
         //Called when there is an error opening the file
@@ -291,8 +256,6 @@ namespace Recording_GUI_2
         //Draws on timer ticks in the canvas
         private void drawMousePath()
         {
-            //MessageBoxResult results = MessageBox.Show("In Draw Mouse");
-
             Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
             double X = mousePosition.X;
             double Y = mousePosition.Y;
@@ -303,7 +266,6 @@ namespace Recording_GUI_2
             myEllipse.Height = 5;
             myEllipse.Width = 5;
             Canvas.SetTop(myEllipse, Y);
-            //Canvas.SetRight(myEllipse, X);
             Canvas.SetLeft(myEllipse, X);
             recordingCanvas.Children.Add(myEllipse);
        }

@@ -17,7 +17,6 @@
                 <Label Name="FileNameLabel" Content="File Name" HorizontalAlignment="Left" Margin="85,158,0,0" VerticalAlignment="Top" Grid.Row="1"/>
         <MediaElement Name="audioMediaElement" MediaEnded="audioMediaElement_MediaEnded" MediaOpened="audioMediaElement_MediaOpened"
                MediaFailed="audioMediaElement_MediaFailed" LoadedBehavior="Manual" Margin="0,0,0,103" Visibility="Hidden"/>
-        <Slider Name="timelineSlider" Margin="146,184,154,91" Grid.Row="1"/>
         <Label Name="audioMediaElementPosition" Content="00:00:00.0000000" HorizontalAlignment="Left" Margin="295,158,0,0" Grid.Row="1" VerticalAlignment="Top"/>
         <Label Name="audioMediaElementLength" Content="00:00:00.0000000" HorizontalAlignment="Left" Margin="402,158,0,0" Grid.Row="1" VerticalAlignment="Top"/>
 
