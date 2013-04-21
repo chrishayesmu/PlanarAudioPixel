@@ -5,6 +5,8 @@
 #include "NetworkConstants.h"
 #include "../pap-file-io/Logger.h"
 
+#include <time.h>
+
 #pragma comment(lib, "../Debug/pap-file-io.lib")
 
 namespace Networking {
@@ -48,13 +50,13 @@ namespace Networking {
 		///<param name="filename">The name of the position data file.</param>
 		///<param name="buffer">The buffer to fill.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		int PlaybackServer::readPositionDataFromFile(char* filename, PositionBuffer& buffer){
+		PlaybackServerErrorCode PlaybackServer::readPositionDataFromFile(const char* filename, PositionBuffer& buffer){
 			if (!filename) return PlaybackServerErrorCodes::PlaybackServer_POINTER;
 
 			Logger::logNotice("Attempting to read volume data from file %s ..", filename);
 
 			//Attempt to open the file
-			FILE* audioFile = fopen(filename, "rb");
+			FILE* audioFile = fopen(filename, "r");
 			if (!audioFile) 
 			{
 				Logger::logWarning("Failed to open volume file %s", filename);
@@ -406,7 +408,8 @@ namespace Networking {
 
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
-						playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
+						//playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
+						playMessage.TransportControl.timeOffset = time(NULL) + 5;
 
 						//Mark when each track began playback
 						for (unsigned int i = 0; i < tracks.size(); ++i) {
@@ -430,7 +433,8 @@ namespace Networking {
 
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
-						playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
+						//playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
+						playMessage.TransportControl.timeOffset = 0; //time(NULL) + 5;
 
 						//Update when each track began playback again
 						for (unsigned int i = 0; i < tracks.size(); ++i) {

@@ -210,7 +210,7 @@ namespace Networking
 				union {
 					//Server to Client - Control
 					struct {
-						/* [8] */ int64_t timeOffset;
+						/* [8] */ uint64_t timeOffset;
 						/* [8] */ requestid_t requestID;
 					};
 					//Client to Server - Acknowledgement

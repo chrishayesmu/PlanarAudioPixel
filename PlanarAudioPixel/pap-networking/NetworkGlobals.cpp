@@ -4,6 +4,7 @@
 #include "NetworkGlobals.h"
 
 #include <Windows.h>
+#include <time.h>
 
 namespace Networking
 {
