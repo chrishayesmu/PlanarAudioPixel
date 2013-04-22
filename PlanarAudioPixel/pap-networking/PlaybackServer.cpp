@@ -56,14 +56,26 @@ namespace Networking {
 			Logger::logNotice("Attempting to read volume data from file %s ..", filename);
 
 			//Attempt to open the file
-			FILE* audioFile = fopen(filename, "r");
+			FILE* audioFile = fopen(filename, "rb");
 			if (!audioFile) 
 			{
 				Logger::logWarning("Failed to open volume file %s", filename);
 				return PlaybackServerErrorCodes::PlaybackServer_FILE;
 			}
 
-			// TODO - actually read from file
+			std::vector<Networking::PositionInfo> data;
+			float x, y;
+			while (fscanf(audioFile, "%f %f", &x, &y)) {
+				PositionInfo info = {x, y};
+				data.push_back(info);
+			}
+
+			float ratio = (float)data.size() / sampleCount;
+			float bufferPos = 0;
+			for (int i = 0; i < sampleCount; ++i) {
+				buffer[i] = data[(int)bufferPos];
+				bufferPos += ratio;
+			}
 			
 			Logger::logNotice("Successfully read volume file %s", filename);
 			return PlaybackServerErrorCodes::PlaybackServer_OK;
@@ -143,7 +155,6 @@ namespace Networking {
 					}
 
 				}
-				if (!sendSize) printf("fuck");
 			}									
 		}
 
@@ -182,10 +193,8 @@ namespace Networking {
 		///<summary>Broadcasts volume information for the client network.</summary>
 		///<param name="trackID">The ID of the track to which this bit of volume data applies.</param>
 		///<param name="sampleID">The ID of the sample to which this bit of volume data applies.</param>
-		///<param name="bufferRangeStartID">The ID of the first sample in the buffering range.</param>
-		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
 		///<returns>Integer return code specifying the result of the call.</returns>
-		void PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID) {
+		void PlaybackServer::sendVolumeData(trackid_t trackID, sampleid_t sampleID) {
 						
 					/// ----- THIS NEEDS TO BE BROADCAST ------
 			// TODO - log buffer start/end? Not clear on what these things are
@@ -202,31 +211,22 @@ namespace Networking {
 			volumeDataMessage.networkHeader.VolumeSample.SampleID = sampleID;
 			volumeDataMessage.networkHeader.VolumeSample.TrackID = trackID;
 
-			//Include the number of clients contained in this volume data message.
-			volumeDataMessage.networkHeader.Extra._dataLength = volumeData.size();
+			for (ClientIterator i = this->clients.begin(); i != this->clients.end(); ++i) {
+				int sendSize = 0;
 
-			//Index into volumeDataMessage.volumeData array.
-			int j = 0;
+				volumeDataMessage.networkHeader.VolumeSample.volume = tracks[trackID].volumeData[sampleID][i->first];
 
-			//Indicator for first/second client in current ClientVolume structure.
-			int e = 0;
-			for (VolumeInfoIterator i = volumeData.begin(); i != volumeData.end(); ++i) {
-				if (e == 0){
-					volumeDataMessage.volumeData[j].clientID_1 = i->first;
-					volumeDataMessage.volumeData[j].clientVolume_1 = i->second;
-					++e;
-				} else {
-					volumeDataMessage.volumeData[j].clientID_2 = i->first;
-					volumeDataMessage.volumeData[j].clientVolume_2 = i->second;
-					e = 0;
-					++j;
+				if ((sendSize = sockets_send_message(
+						i->second.s,
+						&volumeDataMessage.networkHeader,
+						sizeof(volumeDataMessage.networkHeader))) == -1) {
+					//If the send size was 0, assume the socket connection was dropped
+					for (unsigned int j = 0; j < this->clientConnectedCallbacks.size(); ++j) {
+						this->clientDisconnectedCallbacks[j](i->first);
+					}
+
 				}
 			}
-
-			//Broadcast the data
-			
-			this->broadcastMessage(&volumeDataMessage, 
-				sizeof(PacketStructures::NetworkMessage) + sizeof(PacketStructures::ClientVolume) * volumeData.size());
 
 		}
 
@@ -344,10 +344,8 @@ namespace Networking {
 						this->sendAudioSample(bufferTrackID, 
 												this->tracks[bufferTrackID].audioSamples[i],
 												beginBufferRange, endBufferRange);
-						//this->sendVolumeData(bufferTrackID,
-						//						i, this->tracks[bufferTrackID].volumeData[i],
-						//						beginBufferRange, endBufferRange);
-						Networking::busyWait(1000);
+						this->sendVolumeData(bufferTrackID,	i);
+						Networking::busyWait(100);
 					}
 					Networking::busyWait(10000);
 
@@ -385,7 +383,7 @@ namespace Networking {
 							//Add each sample as "not needing to be resent"
 							for (unsigned int j = 0; j < trackBufferSize; ++j) {
 								this->sendAudioSample(i, tracks[i].audioSamples[j], 0, trackBufferSize);
-								//this->sendVolumeData(i, j, tracks[i].volumeData[j], 0, trackBufferSize);
+								this->sendVolumeData(bufferTrackID,	i);
 							}
 
 							if (trackBufferSize == Networking::RequiredBufferedSamplesCount){
@@ -503,7 +501,8 @@ namespace Networking {
 					//Read the audio file
 					int audioCode = this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioSamples);
 					//Read the position file
-					int positionCode = this->readPositionDataFromFile(request.controlData.newTrackInfo.positionFilename, newTrack.positionData);
+					int positionCode = this->readPositionDataFromFile(request.controlData.newTrackInfo.positionFilename, newTrack.audioSamples.size(), newTrack.positionData);
+					this->calculateVolumeData(newTrack.TrackID, 0, newTrack.audioSamples.size());
 
 					//Set the length of the track
 					newTrack.trackLength = newTrack.audioSamples.size() * 100000;

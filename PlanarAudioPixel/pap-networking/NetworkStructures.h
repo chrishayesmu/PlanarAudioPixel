@@ -202,8 +202,8 @@ namespace Networking
 				struct {
 					/* [4] */ trackid_t TrackID;
 					/* [4] */ sampleid_t SampleID;
-					/* [4] */ sampleid_t BufferRangeStartID;
-					/* [4] */ sampleid_t BufferRangeEndID;
+					/* [4] */ float volume;
+					/* [4] */ sampleid_t _unused;
 				} VolumeSample;
 
 				// [16] Transport controls

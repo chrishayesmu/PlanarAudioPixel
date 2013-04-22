@@ -140,7 +140,7 @@ namespace Networking {
 		///<param name="filename">The name of the position data file.</param>
 		///<param name="buffer">The buffer to fill.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		PlaybackServerErrorCode PlaybackServer::readPositionDataFromFile(const char* filename, PositionBuffer& buffer);
+		PlaybackServerErrorCode readPositionDataFromFile(char* filename, int sampleCount, PositionBuffer& buffer);
 
 		///<summary>Calculates the volume for a track, for all sample IDs between sampleStart and
 		/// sampleEnd, inclusive. The volume is stored in this->tracks.</summary>
@@ -162,7 +162,7 @@ namespace Networking {
 		///<param name="sampleID">The ID of the sample to which this bit of volume data applies.</param>
 		///<param name="bufferRangeStartID">The ID of the first sample in the buffering range.</param>
 		///<param name="bufferRangeEndID">The ID of the last sample in the buffering range.</param>
-		void sendVolumeData(trackid_t trackID, sampleid_t sampleID, VolumeInfo volumeData, sampleid_t bufferRangeStartID, sampleid_t bufferRangeEndID);
+		void sendVolumeData(trackid_t trackID, sampleid_t sampleID);
 
 		void broadcastMessage(const void* __restrict data, int size);
 

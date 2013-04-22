@@ -12,7 +12,7 @@ namespace Networking
 
 	unsigned short NetworkPort = 32746;
 
-	unsigned int RequiredBufferedSamplesCount = 1;
+	unsigned int RequiredBufferedSamplesCount = 10;
 
 	unsigned int ContinuousBufferCount = 100;
 
