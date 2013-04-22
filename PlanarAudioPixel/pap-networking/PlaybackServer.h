@@ -140,7 +140,7 @@ namespace Networking {
 		///<param name="filename">The name of the position data file.</param>
 		///<param name="buffer">The buffer to fill.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		PlaybackServerErrorCode readPositionDataFromFile(char* filename, int sampleCount, PositionBuffer& buffer);
+		PlaybackServerErrorCode readPositionDataFromFile(const char* filename, int sampleCount, PositionBuffer& buffer);
 
 		///<summary>Calculates the volume for a track, for all sample IDs between sampleStart and
 		/// sampleEnd, inclusive. The volume is stored in this->tracks.</summary>

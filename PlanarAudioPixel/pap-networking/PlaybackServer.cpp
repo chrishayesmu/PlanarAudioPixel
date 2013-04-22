@@ -50,7 +50,7 @@ namespace Networking {
 		///<param name="filename">The name of the position data file.</param>
 		///<param name="buffer">The buffer to fill.</param>
 		///<returns>TODO: Integer return code specifying the result of the call.</returns>
-		PlaybackServerErrorCode PlaybackServer::readPositionDataFromFile(const char* filename, PositionBuffer& buffer){
+		PlaybackServerErrorCode PlaybackServer::readPositionDataFromFile(const char* filename, int sampleCount, PositionBuffer& buffer){
 			if (!filename) return PlaybackServerErrorCodes::PlaybackServer_POINTER;
 
 			Logger::logNotice("Attempting to read volume data from file %s ..", filename);
