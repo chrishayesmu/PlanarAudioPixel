@@ -111,6 +111,7 @@ namespace Recording_GUI_2
             else
             {
                 MessageBoxResult results = MessageBox.Show("File not saved.");
+                return;
             }
 
             using (StreamWriter outfile = new StreamWriter(path, false))
@@ -124,8 +125,6 @@ namespace Recording_GUI_2
                     outfile.Write("");
                 }
             }
-
-            MessageBoxResult pathResults = MessageBox.Show("Finished recording audio path.\n File: " + path);
         }
 
         //Called when there is an error opening the file
@@ -197,6 +196,19 @@ namespace Recording_GUI_2
             else
             {
                 audioMediaElement.Stop();
+                //Clear the canvas
+                recordingCanvas.Children.Clear();
+
+                //Re-add the rectangle
+                Rectangle rectangle = new Rectangle();
+                rectangle.Width = 414;
+                rectangle.Height = 241;
+                rectangle.Stroke = new SolidColorBrush(Colors.Black);
+                rectangle.StrokeThickness = 1;
+                rectangle.Fill = new SolidColorBrush(Colors.LightGray);
+                Canvas.SetLeft(rectangle, 90);
+                Canvas.SetTop(rectangle, 25);
+                recordingCanvas.Children.Add(rectangle);
             }
 
         }
