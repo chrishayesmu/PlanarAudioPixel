@@ -138,15 +138,17 @@ namespace Networking {
 				// apply clipping to any volumes falling below a threshold
 				for (ClientIterator clientIt = this->clients.begin(); clientIt != this->clients.end(); clientIt++)
 				{
-					clientDistMap[clientIt->first] = 1 ;// (clientDistMap[clientIt->first] - minDist) / (maxDist - minDist);
+					clientDistMap[clientIt->first] = abs(sin((40 * i/(float)sampleEnd)*2*3.14));
 
 					if (clientDistMap[clientIt->first] < MIN_VOLUME_THRESHOLD)
 						clientDistMap[clientIt->first] = 0.0f;
 
 					// Store volume data in global data
-					track.volumeData[sampleStart][clientIt->first] = clientDistMap[clientIt->first];
+					track.volumeData[i][clientIt->first] = clientDistMap[clientIt->first];
 				}
 			}
+
+			this->tracks[trackID] = track;
 		}
 
 		void PlaybackServer::broadcastMessage(const void* __restrict data, int size) {
@@ -395,7 +397,7 @@ namespace Networking {
 							//Add each sample as "not needing to be resent"
 							for (unsigned int j = 0; j < trackBufferSize; ++j) {
 								this->sendAudioSample(i, tracks[i].audioSamples[j], 0, trackBufferSize);
-								//this->sendVolumeData(bufferTrackID,	i);
+								this->sendVolumeData(i, j);
 							}
 
 							if (trackBufferSize == Networking::RequiredBufferedSamplesCount){
