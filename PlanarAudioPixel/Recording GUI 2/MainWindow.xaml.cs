@@ -59,15 +59,11 @@ namespace Recording_GUI_2
                     
             //Draw the mouse position over time
             Point mousePosition = Mouse.GetPosition(this.recordingCanvas);
-            string mousePositionString = mousePosition.ToString();
+            string mousePositionString = mousePosition.ToString().Replace(",", " ");
                     
             if (mousePositionFileString != "")
             {
-                mousePositionFileString += ";\n " + mousePositionString;
-            }
-            else
-            {
-                mousePositionFileString += mousePositionString;
+                mousePositionFileString += "\n" + mousePositionString;
             }
         }
         
@@ -86,6 +82,9 @@ namespace Recording_GUI_2
 
         public void audioMediaElement_MediaOpened(Object sender, RoutedEventArgs e) {
             audioMediaElementLength.Content = audioMediaElement.NaturalDuration.TimeSpan;
+
+            //Give the dimensions of the recording rectangle
+            mousePositionFileString = recordingCanvas.Height.ToString() + " " + recordingCanvas.Width.ToString() + "\n";
         }
 
         //Called when the audio has finished playing
@@ -159,13 +158,6 @@ namespace Recording_GUI_2
             if (file == null)
             {
                 MessageBoxResult results = MessageBox.Show("Error: You must select a file first");
-                return;
-            }
-
-            MessageBoxResult result = MessageBox.Show(this, "Are you sure you want to overwrite the previously recorded path?",
-                                                        "Confirmation", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-            if (result == MessageBoxResult.Cancel)
-            {
                 return;
             }
             
