@@ -63,13 +63,22 @@ namespace Networking {
 				return PlaybackServerErrorCodes::PlaybackServer_FILE;
 			}
 
+			//Parse the window resolution as the first pair of values
+			float width, height;
+			fscanf(audioFile, "%f %f", &width, &height);
+			
+			//Continue parsing each pair of position data
 			std::vector<Networking::PositionInfo> data;
 			float x, y;
 			while (fscanf(audioFile, "%f %f", &x, &y)) {
-				PositionInfo info = {x, y};
+				PositionInfo info = {x / width, y / height};
 				data.push_back(info);
+				char c;
+				if ((c=getc(audioFile)) == EOF) break;
 			}
 
+			//Stretch out the number of position samples linearly to match the number of audio samples
+			//Assuming there are more audio samples than position samples
 			float ratio = (float)data.size() / sampleCount;
 			float bufferPos = 0;
 			for (int i = 0; i < sampleCount; ++i) {
@@ -83,9 +92,7 @@ namespace Networking {
 
 		///<summary>Calculates the volume for a track, for all sample IDs between sampleStart and
 		/// sampleEnd, inclusive. The volume is stored in this->tracks.</summary>
-		///<param name='sampleStart'>The sample ID to begin calculating volume at.</param>
-		///<param name='sampleEnd'>The sample ID to be the last volume calculation.</param>
-		void PlaybackServer::calculateVolumeData(trackid_t trackID, sampleid_t sampleStart, sampleid_t sampleEnd)
+		void PlaybackServer::calculateVolumeData(trackid_t trackID)
 		{
 			// Local variables because I'm lazy
 			TrackInfo track = this->tracks[trackID];
@@ -94,7 +101,8 @@ namespace Networking {
 			// Naive algorithm: scale everything so that the nearest client plays at full volume,
 			// then scale down from there. No regard given to units or any anomalous situations that may arise.
 			// This algorithm will be modified and refined as testing shows how well it works.
-			for (sampleid_t i = sampleStart; i <= sampleEnd; i++)
+			sampleid_t sampleStart =  0, sampleEnd = this->tracks[trackID].audioSamples.size();
+			for (sampleid_t i = sampleStart; i < sampleEnd; i++)
 			{
 				PositionInfo pos = positions[i];
 				ClientGUID closestClient = this->clients.begin()->first;
@@ -130,7 +138,7 @@ namespace Networking {
 				// apply clipping to any volumes falling below a threshold
 				for (ClientIterator clientIt = this->clients.begin(); clientIt != this->clients.end(); clientIt++)
 				{
-					clientDistMap[clientIt->first] = (clientDistMap[clientIt->first] - minDist) / (maxDist - minDist);
+					clientDistMap[clientIt->first] = 1 ;// (clientDistMap[clientIt->first] - minDist) / (maxDist - minDist);
 
 					if (clientDistMap[clientIt->first] < MIN_VOLUME_THRESHOLD)
 						clientDistMap[clientIt->first] = 0.0f;
@@ -373,6 +381,10 @@ namespace Networking {
 						//and ensure that they arrive.
 						for (unsigned int i = 0; i < tracks.size(); ++i) 
 						{
+						
+							//Calculate the volume info for each track
+							this->calculateVolumeData(i);
+
 							//Playing from the beginning of the track implies that the remaining amount of time on a track is the entire length of that track
 							tracks[i].playbackRemainingTime = tracks[i].trackLength;
 
@@ -383,7 +395,7 @@ namespace Networking {
 							//Add each sample as "not needing to be resent"
 							for (unsigned int j = 0; j < trackBufferSize; ++j) {
 								this->sendAudioSample(i, tracks[i].audioSamples[j], 0, trackBufferSize);
-								this->sendVolumeData(bufferTrackID,	i);
+								//this->sendVolumeData(bufferTrackID,	i);
 							}
 
 							if (trackBufferSize == Networking::RequiredBufferedSamplesCount){
@@ -502,7 +514,6 @@ namespace Networking {
 					int audioCode = this->readAudioDataFromFile(request.controlData.newTrackInfo.audioFilename, newTrack.audioSamples);
 					//Read the position file
 					int positionCode = this->readPositionDataFromFile(request.controlData.newTrackInfo.positionFilename, newTrack.audioSamples.size(), newTrack.positionData);
-					this->calculateVolumeData(newTrack.TrackID, 0, newTrack.audioSamples.size());
 
 					//Set the length of the track
 					newTrack.trackLength = newTrack.audioSamples.size() * 100000;

@@ -144,9 +144,7 @@ namespace Networking {
 
 		///<summary>Calculates the volume for a track, for all sample IDs between sampleStart and
 		/// sampleEnd, inclusive. The volume is stored in this->tracks.</summary>
-		///<param name='sampleStart'>The sample ID to begin calculating volume at.</param>
-		///<param name='sampleEnd'>The sample ID to be the last volume calculation.</param>
-		void calculateVolumeData(trackid_t trackID, sampleid_t sampleStart, sampleid_t sampleEnd);
+		void calculateVolumeData(trackid_t trackID);
 
 		//## Possibly add an RTT field to the Client structure and periodically send RTT tracking requests. Then use it 
 		//## to send an accurate expected wait time to a Client for receiving all samples in a buffer range.
