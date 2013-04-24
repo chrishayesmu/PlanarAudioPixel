@@ -27,6 +27,7 @@ namespace Playback_GUI
         int i = 0;
         int j = 0;
         Button[,] closeBtn;
+        Image[,] pixImg;
         PlaybackServer playbackServer = new PlaybackServer();
         string audioFile;
         string positionFile;
@@ -47,16 +48,31 @@ namespace Playback_GUI
             
             //Buttons
             closeBtn = new Button[row, column];
+            pixImg = new Image[row, column];
+            //image
+            BitmapImage bitmap = new BitmapImage(new Uri("/Resources/audioPixel.bmp", UriKind.Relative));
+            Image pixelImage = new Image();
+            pixelImage.Source = bitmap;
+            pixelImage.Stretch = Stretch.Fill;
+
             for (i = 0; i < row; i++)
             {
                 for (j = 0; j < column; j++)
                 {
+                    //image
+                    pixImg[i, j] = new Image();
+                    pixImg[i, j].Source = bitmap;
+                    pixImg[i, j].Stretch = Stretch.Fill;
+
+                    //buttons
                     closeBtn[i, j] = new Button();
-                    closeBtn[i, j].Height = 22;
-                    closeBtn[i, j].Width = 22;
-                    closeBtn[i, j].HorizontalAlignment = HorizontalAlignment.Right;
-                    closeBtn[i, j].VerticalAlignment = VerticalAlignment.Top;
-                    closeBtn[i, j].Content = "X";
+                    closeBtn[i, j].Height = 50;
+                    closeBtn[i, j].Width = 50;
+                    closeBtn[i, j].HorizontalAlignment = HorizontalAlignment.Center;
+                    closeBtn[i, j].VerticalAlignment = VerticalAlignment.Center;
+                    closeBtn[i, j].Content = pixImg[i, j];
+
+
                     pixelGrid.Children.Add(closeBtn[i, j]);
                     Grid.SetRow(closeBtn[i,j], i);
                     Grid.SetColumn(closeBtn[i,j], j);
