@@ -24,8 +24,8 @@ namespace Playback_GUI
         //variables
         int row = 4;
         int column = 6;
-        int gridWidth = 498;
-        int gridHeight = 234;
+        double gridWidth = 0; // = 498;
+        double gridHeight = 0; // = 234;
         int i = 0;
         int j = 0;
         Button[,] closeBtn;
@@ -47,7 +47,9 @@ namespace Playback_GUI
             {
                 pixelGrid.ColumnDefinitions.Add(new ColumnDefinition());
             }
-            
+            gridWidth = pixelGrid.Width;
+            gridHeight = pixelGrid.Height;
+
             //Buttons
             closeBtn = new Button[row, column];
             pixImg = new Image[row, column];
