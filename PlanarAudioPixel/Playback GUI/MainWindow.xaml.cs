@@ -24,6 +24,8 @@ namespace Playback_GUI
         //variables
         int row = 4;
         int column = 6;
+        int gridWidth = 498;
+        int gridHeight = 234;
         int i = 0;
         int j = 0;
         Button[,] closeBtn;
@@ -66,8 +68,8 @@ namespace Playback_GUI
 
                     //buttons
                     closeBtn[i, j] = new Button();
-                    closeBtn[i, j].Height = 50;
-                    closeBtn[i, j].Width = 50;
+                    closeBtn[i, j].Height = gridHeight / row;
+                    closeBtn[i, j].Width = gridWidth / column;
                     closeBtn[i, j].HorizontalAlignment = HorizontalAlignment.Center;
                     closeBtn[i, j].VerticalAlignment = VerticalAlignment.Center;
                     closeBtn[i, j].Content = pixImg[i, j];
