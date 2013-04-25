@@ -13,7 +13,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	printf("Error code: %d\n", Networking::PlaybackServer::Create(&server));
 
 	server->ServerStart();
-	server->AddTrack("C:\\Users\\Giancarlo\\Downloads\\02_Universally_Speaking.wav", "C:\\Users\\Giancarlo\\Documents\\audio_path.txt");
+	server->AddTrack("C:\\Users\\Giancarlo\\Documents\\beethoven.wav", "C:\\Users\\Giancarlo\\Documents\\audio_path.txt");
+	getchar();
 	server->Play();
 
 	int pause = 0;

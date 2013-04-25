@@ -138,7 +138,7 @@ namespace Networking {
 				// apply clipping to any volumes falling below a threshold
 				for (ClientIterator clientIt = this->clients.begin(); clientIt != this->clients.end(); clientIt++)
 				{
-					clientDistMap[clientIt->first] = abs(sin((40 * i/(float)sampleEnd)*2*3.14));
+					clientDistMap[clientIt->first] = (clientDistMap[clientIt->first] - minDist) / (maxDist - minDist);//abs(sin((40 * i/(float)sampleEnd)*2*3.14));
 
 					if (clientDistMap[clientIt->first] < MIN_VOLUME_THRESHOLD)
 						clientDistMap[clientIt->first] = 0.0f;
@@ -421,7 +421,7 @@ namespace Networking {
 						//Indicate that playback should begin 3 x The set timeout for resending packets, giving the clients
 						//approximately two chances to have their play controls dropped.
 						//playMessage.TransportControl.timeOffset = getMicroseconds() + 3 * Networking::ClientReceivedPacketTimeout;
-						playMessage.TransportControl.timeOffset = time(NULL) + 5;
+						playMessage.TransportControl.timeOffset = time(NULL)*1000 + 5000;
 
 						//Mark when each track began playback
 						for (unsigned int i = 0; i < tracks.size(); ++i) {
