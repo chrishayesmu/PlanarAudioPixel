@@ -25,7 +25,7 @@ namespace Networking
 	// The number of sample to buffer while playing
 	extern unsigned int ContinuousBufferCount;
 
-	const unsigned int SampleSize = 15000;
+	const unsigned int SampleSize = 1500;
 
 	// The number of microseconds to wait for a resend request before assuming that a client has or hasn't received a packet
 	extern time_t ClientReceivedPacketTimeout;

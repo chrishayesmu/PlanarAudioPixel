@@ -65,13 +65,13 @@ namespace Networking {
 
 			//Parse the window resolution as the first pair of values
 			float width, height;
-			fscanf(audioFile, "%f %f", &width, &height);
+			fscanf(audioFile, "%f %f", &height, &width);
 			
 			//Continue parsing each pair of position data
 			std::vector<Networking::PositionInfo> data;
 			float x, y;
 			while (fscanf(audioFile, "%f %f", &x, &y)) {
-				PositionInfo info = {x / width, y / height};
+				PositionInfo info = {6.0f * x / width, 4.0f * (1.0f - y / height)};
 				data.push_back(info);
 				char c;
 				if ((c=getc(audioFile)) == EOF) break;
@@ -105,11 +105,14 @@ namespace Networking {
 			for (sampleid_t i = sampleStart; i < sampleEnd; i++)
 			{
 				PositionInfo pos = positions[i];
-				ClientGUID closestClient = this->clients.begin()->first;
-				ClientGUID furthestClient = closestClient;
-
+				
 				// Map between ClientGUIDs and their distance from the audio source
 				std::map<ClientGUID, float> clientDistMap;
+				
+				float minDist = 1000000.0f;
+				float maxDist = 0.0f;
+
+				ClientGUID minClient, maxClient;
 
 				// Record each client's distance from the source
 				for (ClientIterator clientIt = this->clients.begin(); clientIt != this->clients.end(); clientIt++)
@@ -119,32 +122,41 @@ namespace Networking {
 
 					clientDistMap[clientIt->first] = dist;
 
-					if (dist < clientDistMap[closestClient])
+					if (dist < minDist)
 					{
-						closestClient = clientIt->first;
+						minDist = dist;
+						minClient = clientIt->first;
 					}
 
-					if (dist > clientDistMap[furthestClient])
+					if (dist > maxDist)
 					{
-						furthestClient = clientIt->first;
+						maxDist = dist;
+						maxClient = clientIt->first;
 					}
 				}
 
-				// Min and max found; record those now before the next loop can modify them
-				float minDist = clientDistMap[closestClient];
-				float maxDist = clientDistMap[furthestClient];
-
+				float denom = maxDist - minDist;
 				// Now go back through and scale each distance to fit in the range [0, 1];
 				// apply clipping to any volumes falling below a threshold
+				int printNum = 0;
 				for (ClientIterator clientIt = this->clients.begin(); clientIt != this->clients.end(); clientIt++)
 				{
-					clientDistMap[clientIt->first] = (clientDistMap[clientIt->first] - minDist) / (maxDist - minDist);//abs(sin((40 * i/(float)sampleEnd)*2*3.14));
+					float dist = clientDistMap[clientIt->first];
+					float volume = .5 * (1.0f - (clientDistMap[clientIt->first] - minDist) / denom);
+					volume = volume * volume;//abs(sin((40 * i/(float)sampleEnd)*2*3.14));
 
-					if (clientDistMap[clientIt->first] < MIN_VOLUME_THRESHOLD)
-						clientDistMap[clientIt->first] = 0.0f;
+					if (volume < MIN_VOLUME_THRESHOLD)
+						volume = 0.0f;
 
 					// Store volume data in global data
-					track.volumeData[i][clientIt->first] = clientDistMap[clientIt->first];
+					track.volumeData[i][clientIt->first] = volume;
+					char guidString[100];
+					formatGUIDAsString(guidString, clientIt->first);
+					printNum++;
+					if (printNum == 21)
+					{
+						Logger::logNotice("Got volume %f for %s in sample %d (x: %f, y: %f, distance %f, cX: %f, cY : %f)\n", volume, guidString, i, pos.x, pos.y, dist, clientIt->second.Offset.x, clientIt->second.Offset.y);
+					}
 				}
 			}
 
@@ -214,17 +226,20 @@ namespace Networking {
 			// TODO what happens if there's more than 121 clients worth of data? We need to send multiple messages
 			struct {
 				PacketStructures::NetworkMessage networkHeader;
-				PacketStructures::ClientVolume volumeData[121];
 			} volumeDataMessage;
 
 			volumeDataMessage.networkHeader.ControlByte = ControlBytes::SENDING_VOLUME;
 			volumeDataMessage.networkHeader.VolumeSample.SampleID = sampleID;
 			volumeDataMessage.networkHeader.VolumeSample.TrackID = trackID;
 
+			int printNum = 0;
 			for (ClientIterator i = this->clients.begin(); i != this->clients.end(); ++i) {
 				int sendSize = 0;
 
 				volumeDataMessage.networkHeader.VolumeSample.volume = tracks[trackID].volumeData[sampleID][i->first];
+				printNum++;
+				if (printNum == 21)
+					Logger::logNotice("Sending volume of %f to client 23", volumeDataMessage.networkHeader.VolumeSample.volume);
 
 				if ((sendSize = sockets_send_message(
 						i->second.s,
