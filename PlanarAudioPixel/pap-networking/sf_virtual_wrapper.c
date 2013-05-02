@@ -1,4 +1,4 @@
-#ifdef RASPBERRY_PI
+#ifdef PLAYBACKCLIENT
 /*
 * Definition file for sf_virtual_wrapper.h
 *
@@ -181,5 +181,10 @@ int add_to_buffer(AudioBufferData* audioBuffer, void* data, int numBytes)
 	audioBuffer->nextByteToBuffer += numBytes;
 
 	return numBytes;
+}
+
+int end_of_buffer(AudioBufferData* audioBuffer)
+{
+	return audioBuffer->nextByteToRead == audioBuffer->length;
 }
 #endif

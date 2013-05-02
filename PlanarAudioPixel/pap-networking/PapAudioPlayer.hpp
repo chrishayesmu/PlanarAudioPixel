@@ -1,4 +1,4 @@
-#ifdef RASPBERRY_PI
+#ifdef PLAYBACKCLIENT
 #include <portaudio.h>
 #include <sndfile.h>
 
@@ -55,7 +55,10 @@ class PapAudioPlayer
 
 		// Returns true if the audio is currently playing. 
 		bool isAudioPlaying() const;
-	
+
+		// Returns true if the end of the internal buffer has been reached.
+		bool endOfBuffer() const;
+
 		// Plays the audio player from the beginning if it has not been previously played,
 		// or from the last playback position if it has been played and then paused.
 		bool play();

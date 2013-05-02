@@ -1,4 +1,4 @@
-#ifdef RASPBERRY_PI
+#ifdef PLAYBACKCLIENT
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +15,7 @@ PapAudioPlayer::PapAudioPlayer(int length, int sampleSize) : audioFile(NULL), au
 
 	// Allocate volumeBuffer with room for one extra sample in case of rounding
 	int numSamples = length / sampleSize;
+	printf("Anticipating %d samples (due to length: %d, sample size: %d)\n", numSamples, length, sampleSize);
 	this->volumeBuffer = (float*) malloc( (numSamples + 1) * sizeof(float) );
 }
 
@@ -83,6 +84,11 @@ bool PapAudioPlayer::play()
 	return true;
 }
 
+bool PapAudioPlayer::pause()
+{
+	this->isPlaying = false;
+}
+
 SF_INFO PapAudioPlayer::getFileInfo() const 
 {
 	return this->audioFileInfo;
@@ -91,6 +97,11 @@ SF_INFO PapAudioPlayer::getFileInfo() const
 bool PapAudioPlayer::isAudioPlaying() const
 {
 	return isPlaying;
+}
+
+bool PapAudioPlayer::endOfBuffer() const
+{
+	return end_of_buffer(this->audioBuffer);
 }
 
 // ---------- Private functions ----------
@@ -122,6 +133,11 @@ int audioOutputCallback(const void* input, void* output, unsigned long frameCoun
 	float* out = (float*) output;
 	float tempBuffer[player->sampleSize];
 
+	static int totalBytesRead = 0;
+
+	if (!player->isPlaying)
+		return 0;
+
 	int numRequestedBytes = 2 * frameCount * player->audioFileInfo.channels;
 
 	while (numRequestedBytes > 0)
@@ -129,7 +145,7 @@ int audioOutputCallback(const void* input, void* output, unsigned long frameCoun
 		int bytesLeftInSample = player->sampleSize - player->nextByteInSample;
 		int bytesToRead = bytesLeftInSample < numRequestedBytes ? bytesLeftInSample : numRequestedBytes; 
 		
-		int framesToRead = bytesToRead / ( 2 * player->audioFileInfo.channels );
+		int framesToRead = frameCount;
 
 		// I don't know why this is multiplied by 4, but it works
 		int bytesRead = 4 * sf_readf_float(player->audioFile, tempBuffer, framesToRead) * player->audioFileInfo.channels;
@@ -137,12 +153,25 @@ int audioOutputCallback(const void* input, void* output, unsigned long frameCoun
 		// If no bytes read, we've reached EOF, so end playback completely
 		if (bytesRead == 0)
 		{
-			player->isPlaying = false;
-			return paComplete;
+			if (end_of_buffer(player->audioBuffer))
+			{
+				printf("Ending audio playback..\n");
+				player->isPlaying = false;
+				return paComplete;
+			}
+			else
+			{
+				printf("Temporarily low on data\n");
+				return 0;
+			}
 		}
+
+		totalBytesRead += bytesRead;
 
 		// Go through the data and adjust the volume
 		float vol = player->volumeBuffer[ player->nextSampleID ];
+//		printf("Retrieved vol of %f for sample %d (total: %d)\n", vol, player->nextSampleID, totalBytesRead);
+
 		for (int i = 0; i < bytesRead / 2; i++)
 		{
 			tempBuffer[i] *= vol;
@@ -154,12 +183,12 @@ int audioOutputCallback(const void* input, void* output, unsigned long frameCoun
 
 		// Update iteration variables and class members
 		numRequestedBytes -= bytesRead;
-		player->nextByteInSample += bytesRead;
+		player->nextByteInSample += bytesRead / 2;
 
 		// Loop back around if end of sample is reached
 		if (player->nextByteInSample >= player->sampleSize)
 		{
-			player->nextByteInSample = 0;
+			player->nextByteInSample -= player->sampleSize;
 			player->nextSampleID++;
 		}
 	}

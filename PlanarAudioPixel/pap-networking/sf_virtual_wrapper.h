@@ -1,4 +1,4 @@
-#ifdef RASPBERRY_PI
+#ifdef PLAYBACKCLIENT
 /*
 * This file defines a function for retrieving an SF_VIRTUAL_IO struct
 * that is configured for buffered data. It also declares a struct which
@@ -49,6 +49,9 @@ SF_VIRTUAL_IO get_buffered_sf_virtual_io(AudioBufferData** audioBuffer, int leng
 
 // Adds data to the audio buffer. 
 int add_to_buffer(AudioBufferData* audioBuffer, void* data, int numBytes);
+
+// Determines if the audio buffer has reached its ultimate end or is just temporarily empty.
+int end_of_buffer(AudioBufferData* audioBuffer);
 
 void delete_buffer(AudioBufferData* audioBuffer);
 #endif
